@@ -43,26 +43,61 @@ int input(char *buff) {
 }
 
 int add_faculty(int socket_fd) {
+	char name[100];
+	char email[100];
+	char password[100];
+	output("Enter name: ");
+	int res = input_size(name, sizeof(name));
+	output("Enter email: ");
+	res = input_size(email, sizeof(email));
+	output("Enter password: ");
+	res = input_size(password, sizeof(password));
+	// Send data to server
 	return 0;
 }
 
 int edit_faculty(int socket_fd) {
+	char id[100];
+	output("Enter faculty id: ");
+	input_size(id, sizeof(id));
+	// Send data to server
 	return 0;
 }
 
 int status_faculty(int socket_fd) {
+	char id[100];
+    output("Enter faculty id: ");
+    input_size(id, sizeof(id));
+	char option;
+	output("Enter 1 to activate or 0 to deactivate: ");
+	input_size(&option, 1);
 	return 0;
 }
 
 int add_student(int socket_fd) {
+	char name[100];
+    char email[100];
+    char password[100];
+    output("Enter name: ");
+    int res = input_size(name, sizeof(name));
+    output("Enter email: ");
+    res = input_size(email, sizeof(email));
+    output("Enter password: ");
+    res = input_size(password, sizeof(password));
 	return 0;
 }
 
 int edit_student(int socket_fd) {
+	char id[100];
+    output("Enter student id: ");
+    input_size(id, sizeof(id));
 	return 0;
 }
 
 int status_student(int socket_fd) {
+	char id[100];
+    output("Enter student id: ");
+    input_size(id, sizeof(id));
 	return 0;
 }
 
@@ -108,18 +143,33 @@ int admin(int socket_fd) {
 }
 
 int add_course(int socket_fd, int fid) {
+	char name[100];
+	char semesters[100];
+	output("Enter course name: ");
+	input_size(name, sizeof(name));
+	output("Enter semesters: ");
+	input_size(semesters, sizeof(semesters));
 	return 0;
 }
 
 int remove_course(int socket_fd, int fid) {
+	char id[100];
+	output("Enter course id: ");
+	input_size(id, sizeof(id));
 	return 0;
 }
 
 int view_enrollments(int socket_fd, int fid) {
+	output("Enter course id: ");
+	char id[100];
+	input_size(id, sizeof(id));
 	return 0;
 }
 
 int change_password(int socket_fd, int id, int user) {
+	char password[100];
+	output("Enter new password: ");
+	read(password, sizeof(password));
 	return 0;
 }
 
@@ -159,10 +209,16 @@ int faculty(int socket_fd) {
 }
 
 int enroll_course(int socket_fd, int sid) {
+	char id[100];
+	output("Enter course id: ");
+	input_size(id, sizeof(id));
 	return 0;
 }
 
 int unenroll_course(int socket_fd, int sid) {
+	char id[100];
+    output("Enter course id: ");
+    input_size(id, sizeof(id));
 	return 0;
 }
 
