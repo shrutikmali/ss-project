@@ -286,16 +286,38 @@ int admin(int socket_fd) {
 }
 
 int add_course(int socket_fd, int fid) {
+	// Declare course fields
+
 	char name[100];
-	char semesters[100];
-	char credits[100];
+	int credits;
+	int maxStrength;
 	output("Enter course name: ");
 	input_size(name, sizeof(name));
-	output("Enter semesters: ");
-	input_size(semesters, sizeof(semesters));
+	char credits_str[10];
 	output("Enter credits: ");
-	input_size(credits, sizeof(credits));
-	return 0;
+	input_size(credits_str, sizeof(credits_str));
+	credits = parse_int(credits_str);
+	char maxStrength_str[10];
+	output("Enter maximum class size: ");
+	input_size(maxStrength_str, sizeof(maxStrength_str));
+	maxStrength = parse_int(maxStrength_str);
+
+	send(cfd, &fid, sizeof(fid), 0);
+	send(cfd, &name, sizeof(name), 0);
+	send(cfd, &credits, sizeof(credits), 0);
+	send(cfd, &maxStrength, sizeof(maxStrength), 0);
+
+	int res;
+	recv(cfd, &res, sizeof(res), 0);
+
+	if(res == 0) {
+		output("Course added successfully\n");
+	}
+	else {
+		output("Server oof'd in adding course\n");
+	}
+
+	return res;
 }
 
 int remove_course(int socket_fd, int fid) {

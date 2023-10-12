@@ -548,6 +548,35 @@ int status_student(int cfd) {
 }
 
 int add_course(int cfd) {
+	struct Course course;
+	struct Faculty faculty;
+	char name[100];
+	int credits;
+	int maxStrength;
+	int fid;
+	/*
+	int id;
+	char name[100];
+	int fid;
+	int credits;
+	int maxStrength;
+	int students[100];
+	int studentIdx;
+	*/
+	recv(cfd, &fid, sizeof(fid), 0);
+	recv(cfd, &name, sizeof(name), 0);
+	recv(cfd, &credits, sizeof(credits), 0);
+	recv(cfd, &maxStrength, sizeof(maxStrength), 0);
+	course.id = get_id(COURSE);
+	course.fid = fid;
+	course.maxStrength = maxStrength;
+	course.credits = credits;
+	string_copy(name, course.name);
+	course.studentIdx = 0;
+
+	int res = 0;
+	send(cfd, &res, sizeof(res), 0);
+
 	return 0;
 }
 
