@@ -440,7 +440,49 @@ int status_faculty(int cfd) {
 }
 
 int add_student(int cfd) {
-	return 0;
+	// TODO: add check to see if email already exists
+	char name[100];
+	char email[100];
+	char password[100];
+	struct Student newStudent;
+	
+	recv(cfd, &name, sizeof(name), 0);
+	recv(cfd, &email, sizeof(email), 0);
+	recv(cfd, &password, sizeof(password), 0);
+	
+	int newId = get_id(STUDENT);
+	int res = -1;
+	if(newId == -1) {
+		output("Error getting id:add_student\n");
+		res = -1;
+	}
+	else {
+		newStudent.id = newId;
+		string_copy(name, newStudent.name);
+		string_copy(email, newStudent.email);
+		string_copy(password, newStudent.password);
+		newStudent.courseIdx = 0;
+		newStudent.status = 1;
+		
+		
+		int fd = open("./data/student", O_WRONLY);
+		int seek_res = lseek(fd, 0, SEEK_END);
+		struct flock lock;
+		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newStudent));
+		if(lock_res == -1) {
+			output("Error in locking faculty:add_student\n");
+			res = -1;
+		}
+		else {
+			res = write(fd, &newStudent, sizeof(newStudent));
+			int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newStudent));
+			if(unlock_res == -1) {
+				output("Error in unlocking faculty:add_student\n");
+			}
+		}
+	}
+	send(cfd, &res, sizeof(res), 0);
+	return res;
 }
 
 int edit_student(int cfd) {

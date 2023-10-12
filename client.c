@@ -171,15 +171,14 @@ int status_faculty(int sfd) {
 
 int add_student(int socket_fd) {
 	char name[100];
-    	char email[100];
-    	char password[100];
-    	output("Enter name: ");
-    	int res = input_size(name, sizeof(name));
+	char email[100];
+	char password[100];
+	output("Enter name: ");
+	int res = input_size(name, sizeof(name));
 	output("Enter email: ");
 	res = input_size(email, sizeof(email));
 	output("Enter password: ");
 	res = input_size(password, sizeof(password));
-	
 	recv(sfd, &res, sizeof(res), 0);
 	if(res != 0) {
 		output("Server oof'd in adding student\n");
