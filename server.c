@@ -387,7 +387,7 @@ int edit_faculty(int cfd) {
 	recv(sfd, &email, sizeof(email), 0);
 	recv(sfd, &password, sizeof(password), 0);
 
-	int fd = open("./data/faculty, O_WRONLY);
+	int fd = open("./data/faculty", O_WRONLY);
 	lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
 	struct Faculty faculty;
 	struct flock lock;
@@ -421,8 +421,21 @@ int edit_faculty(int cfd) {
 
 int status_faculty(int cfd) {
 	int id, option;
-	recv(cfd, &id, 
-
+	recv(cfd, &id, sizeof(id), 0);
+	recv(cfd, &option, sizeof(option), 0);
+	// Open the file
+	int fd = open("./data/faculty", O_RDWR);
+	struct Faculty faculty;
+	lseek(fd, SEEK_SET, (id - 1) * sizeof(faculty));
+	// Acquire a lock
+	int lock_res = set_lock(int fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+	read(fd, &faculty, sizeof(faculty));
+	faculty.status = option;
+	lseek(fd, SEEK_CUR, -1 * (sizeof(faculty)));
+	write(fd, &faculty, sizeof(faculty));
+	close(fd);
+	int res = 1;
+	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 
