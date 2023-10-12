@@ -528,6 +528,22 @@ int edit_student(int cfd) {
 }
 
 int status_student(int cfd) {
+	int id, option;
+	recv(cfd, &id, sizeof(id), 0);
+	recv(cfd, &option, sizeof(option), 0);
+	// Open the file
+	int fd = open("./data/student", O_RDWR);
+	struct Student student;
+	lseek(fd, SEEK_SET, (id - 1) * sizeof(student));
+	// Acquire a lock
+	int lock_res = set_lock(int fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+	read(fd, &student, sizeof(student));
+	student.status = option;
+	lseek(fd, SEEK_CUR, -1 * (sizeof(student)));
+	write(fd, &student, sizeof(student));
+	close(fd);
+	int res = 1;
+	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 

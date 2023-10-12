@@ -219,9 +219,28 @@ int edit_student(int socket_fd) {
 }
 
 int status_student(int socket_fd) {
-	char id[100];
-    output("Enter student id: ");
-    input_size(id, sizeof(id));
+	char id_str[100];
+	output("Enter student id: ");
+	int size = input_size(id, sizeof(id));
+	
+	int id = parse_id(size, id_str);
+	char option_char;
+	output("Enter 1 to activate or 0 to deactivate: ");
+	input_size(&option, 1);
+	int option = (int)(option - '0');
+	send(sfd, &id, sizeof(id), 0);
+	send(sfd, &option, sizeof(option), 0);
+	
+	int res;
+	recv(sfd, &res, sizeof(res), 0);
+	
+	if(res == 1) {
+		output("Status updated\n");
+	}
+	else {
+		output("Server oof'd while changing status\n");
+	}	
+	
 	return 0;
 }
 
