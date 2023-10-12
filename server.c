@@ -387,9 +387,9 @@ int edit_faculty(int cfd) {
 	recv(sfd, &email, sizeof(email), 0);
 	recv(sfd, &password, sizeof(password), 0);
 
-	int fd = open("./data/faculty", O_WRONLY);
-	lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
+	int fd = open("./data/faculty", O_RDWR);
 	struct Faculty faculty;
+	lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
 	struct flock lock;
 	
 	// First get lock
@@ -486,6 +486,44 @@ int add_student(int cfd) {
 }
 
 int edit_student(int cfd) {
+	int id;
+	char name[100];
+	char email[100];
+	char password[100];
+	recv(cfd, &id, sizeof(id), 0);
+	recv(sfd, &name, sizeof(name), 0);
+	recv(sfd, &email, sizeof(email), 0);
+	recv(sfd, &password, sizeof(password), 0);
+
+	int fd = open("./data/student", O_RDWR);
+	struct Student student;
+	lseek(fd, sizeof(student) * (id - 1), SEEK_SET);
+	struct flock lock;
+	
+	// First get lock
+	int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(student));
+	int res = -1;
+	if(lock_res == -1) {
+		output("Error getting read lock:edit_faculty\n");
+		res = -1;
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else {
+		// Read into struct
+		read(fd, &student, sizeof(student));
+		string_copy(name, student.name);
+		string_copy(email, student.email);
+		string copy(password, student.password);
+		
+		// Write struct back to file
+		lseek(fd, sizeof(student) * -1, SEEK_CUR);
+		write(fd, &student, sizeof(student));
+		lseek(fd, sizeof(student) * -1, SEEK_CUR);
+		lock_res = set_lock(fd, UNLOCK, SEEK_CUR, 0, sizeof(student));
+		res = 0;
+		send(cfd, &res, sizeof(res), 0);
+	}
+
 	return 0;
 }
 

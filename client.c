@@ -188,9 +188,33 @@ int add_student(int socket_fd) {
 }
 
 int edit_student(int socket_fd) {
-	char id[100];
-    output("Enter student id: ");
-    input_size(id, sizeof(id));
+	char id_str[100];
+	output("Enter student id: ");
+	int size = input_size(id, sizeof(id));
+	int id = parse_id(size, id_str);
+	
+	// Send data to server
+	char name[100];
+	char email[100];
+	char password[100];
+	output("Enter new name: ");
+	int res = input_size(name, sizeof(name));
+	output("Enter new email: ");
+	res = input_size(email, sizeof(email));
+	output("Enter new password: ");
+	res = input_size(password, sizeof(password));
+	send(sfd, &id, sizeof(id), 0);
+	send(sfd, &name, sizeof(name), 0);
+	send(sfd, &email, sizeof(email), 0);
+	send(sfd, &password, sizeof(password), 0);
+	
+	recv(sfd, &res, sizeof(res), 0);
+	if(res != 0) {
+		output("Server oof'd in editing student\n");
+	}
+	else {
+		output("Student edited\n");
+	}
 	return 0;
 }
 
