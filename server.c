@@ -383,9 +383,9 @@ int edit_faculty(int cfd) {
 	char email[100];
 	char password[100];
 	recv(cfd, &id, sizeof(id), 0);
-	recv(sfd, &name, sizeof(name), 0);
-	recv(sfd, &email, sizeof(email), 0);
-	recv(sfd, &password, sizeof(password), 0);
+	recv(cfd, &name, sizeof(name), 0);
+	recv(cfd, &email, sizeof(email), 0);
+	recv(cfd, &password, sizeof(password), 0);
 
 	int fd = open("./data/faculty", O_RDWR);
 	struct Faculty faculty;
@@ -405,13 +405,14 @@ int edit_faculty(int cfd) {
 		read(fd, &faculty, sizeof(faculty));
 		string_copy(name, faculty.name);
 		string_copy(email, faculty.email);
-		string copy(password, faculty.password);
+		string_copy(password, faculty.password);
 		
 		// Write struct back to file
 		lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
 		write(fd, &faculty, sizeof(faculty));
 		lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
-		lock_res = set_lock(fd, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
+		struct flock lock;
+		lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
 		res = 0;
 		send(cfd, &res, sizeof(res), 0);
 	}
@@ -426,12 +427,13 @@ int status_faculty(int cfd) {
 	// Open the file
 	int fd = open("./data/faculty", O_RDWR);
 	struct Faculty faculty;
-	lseek(fd, SEEK_SET, (id - 1) * sizeof(faculty));
+	lseek(fd, (id - 1) * sizeof(faculty), SEEK_SET);
 	// Acquire a lock
-	int lock_res = set_lock(int fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+	struct flock lock;
+	int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
 	read(fd, &faculty, sizeof(faculty));
 	faculty.status = option;
-	lseek(fd, SEEK_CUR, -1 * (sizeof(faculty)));
+	lseek(fd, -1 * (sizeof(faculty)), SEEK_CUR);
 	write(fd, &faculty, sizeof(faculty));
 	close(fd);
 	int res = 1;
@@ -491,9 +493,9 @@ int edit_student(int cfd) {
 	char email[100];
 	char password[100];
 	recv(cfd, &id, sizeof(id), 0);
-	recv(sfd, &name, sizeof(name), 0);
-	recv(sfd, &email, sizeof(email), 0);
-	recv(sfd, &password, sizeof(password), 0);
+	recv(cfd, &name, sizeof(name), 0);
+	recv(cfd, &email, sizeof(email), 0);
+	recv(cfd, &password, sizeof(password), 0);
 
 	int fd = open("./data/student", O_RDWR);
 	struct Student student;
@@ -513,13 +515,13 @@ int edit_student(int cfd) {
 		read(fd, &student, sizeof(student));
 		string_copy(name, student.name);
 		string_copy(email, student.email);
-		string copy(password, student.password);
+		string_copy(password, student.password);
 		
 		// Write struct back to file
 		lseek(fd, sizeof(student) * -1, SEEK_CUR);
 		write(fd, &student, sizeof(student));
 		lseek(fd, sizeof(student) * -1, SEEK_CUR);
-		lock_res = set_lock(fd, UNLOCK, SEEK_CUR, 0, sizeof(student));
+		lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(student));
 		res = 0;
 		send(cfd, &res, sizeof(res), 0);
 	}
@@ -534,12 +536,13 @@ int status_student(int cfd) {
 	// Open the file
 	int fd = open("./data/student", O_RDWR);
 	struct Student student;
-	lseek(fd, SEEK_SET, (id - 1) * sizeof(student));
+	lseek(fd, (id - 1) * sizeof(student), SEEK_SET);
 	// Acquire a lock
-	int lock_res = set_lock(int fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+	struct flock lock;
+	int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
 	read(fd, &student, sizeof(student));
 	student.status = option;
-	lseek(fd, SEEK_CUR, -1 * (sizeof(student)));
+	lseek(fd,  -1 * (sizeof(student)), SEEK_CUR);
 	write(fd, &student, sizeof(student));
 	close(fd);
 	int res = 1;
@@ -554,15 +557,6 @@ int add_course(int cfd) {
 	int credits;
 	int maxStrength;
 	int fid;
-	/*
-	int id;
-	char name[100];
-	int fid;
-	int credits;
-	int maxStrength;
-	int students[100];
-	int studentIdx;
-	*/
 	recv(cfd, &fid, sizeof(fid), 0);
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &credits, sizeof(credits), 0);

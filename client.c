@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 int ADMIN = 1;
 int FACULTY = 2;
@@ -57,7 +58,7 @@ int login(int sfd, int type) {
 	int logged_in = 0;
 	int res = send(sfd, &type, sizeof(type), 0);
 	if(res == -1) {
-		perror("Error sending login type: ");
+		output("Error sending login type\n");
 		return -1;
 	}
 	while(!logged_in) {
@@ -77,7 +78,7 @@ int login(int sfd, int type) {
 			output("User not found\n");
 		}
 		else if(response == -2) {
-			perror("Server oof'd\n");
+			output("Server oof'd\n");
 			return -1;
 		}
 		else {
@@ -115,8 +116,8 @@ int add_faculty(int sfd) {
 int edit_faculty(int sfd) {
 	char id_str[100];
 	output("Enter faculty id: ");
-	int size = input_size(id, sizeof(id));
-	int id = parse_id(size, id_str);
+	int size = input_size(id_str, sizeof(id_str));
+	int id = parse_int(size, id_str);
 	
 	// Send data to server
 	char name[100];
@@ -146,12 +147,12 @@ int edit_faculty(int sfd) {
 int status_faculty(int sfd) {
 	char id_str[100];
 	output("Enter faculty id: ");
-	int size = input_size(id, sizeof(id));
+	int size = input_size(id_str, sizeof(id_str));
 	
-	int id = parse_id(size, id_str);
+	int id = parse_int(size, id_str);
 	char option_char;
 	output("Enter 1 to activate or 0 to deactivate: ");
-	input_size(&option, 1);
+	input_size(&option_char, 1);
 	int option = (int)(option - '0');
 	send(sfd, &id, sizeof(id), 0);
 	send(sfd, &option, sizeof(option), 0);
@@ -169,7 +170,7 @@ int status_faculty(int sfd) {
 	return 0;
 }
 
-int add_student(int socket_fd) {
+int add_student(int sfd) {
 	char name[100];
 	char email[100];
 	char password[100];
@@ -187,11 +188,11 @@ int add_student(int socket_fd) {
 	return 0;
 }
 
-int edit_student(int socket_fd) {
+int edit_student(int sfd) {
 	char id_str[100];
 	output("Enter student id: ");
-	int size = input_size(id, sizeof(id));
-	int id = parse_id(size, id_str);
+	int size = input_size(id_str, sizeof(id_str));
+	int id = parse_int(size, id_str);
 	
 	// Send data to server
 	char name[100];
@@ -218,21 +219,21 @@ int edit_student(int socket_fd) {
 	return 0;
 }
 
-int status_student(int socket_fd) {
+int status_student(int cfd) {
 	char id_str[100];
 	output("Enter student id: ");
-	int size = input_size(id, sizeof(id));
+	int size = input_size(id_str, sizeof(id_str));
 	
-	int id = parse_id(size, id_str);
+	int id = parse_int(size, id_str);
 	char option_char;
 	output("Enter 1 to activate or 0 to deactivate: ");
-	input_size(&option, 1);
-	int option = (int)(option - '0');
-	send(sfd, &id, sizeof(id), 0);
-	send(sfd, &option, sizeof(option), 0);
+	input_size(&option_char, 1);
+	int option = (int)(option_char - '0');
+	send(cfd, &id, sizeof(id), 0);
+	send(cfd, &option, sizeof(option), 0);
 	
 	int res;
-	recv(sfd, &res, sizeof(res), 0);
+	recv(cfd, &res, sizeof(res), 0);
 	
 	if(res == 1) {
 		output("Status updated\n");
@@ -285,30 +286,30 @@ int admin(int socket_fd) {
 	return res;
 }
 
-int add_course(int socket_fd, int fid) {
+int add_course(int sfd, int fid) {
 	// Declare course fields
 
 	char name[100];
 	int credits;
 	int maxStrength;
 	output("Enter course name: ");
-	input_size(name, sizeof(name));
-	char credits_str[10];
+	int len = input_size(name, sizeof(name));
+	char credits_str[100];
 	output("Enter credits: ");
-	input_size(credits_str, sizeof(credits_str));
-	credits = parse_int(credits_str);
-	char maxStrength_str[10];
+	len = input_size(credits_str, sizeof(credits_str));
+	credits = parse_int(len, credits_str);
+	char maxStrength_str[100];
 	output("Enter maximum class size: ");
-	input_size(maxStrength_str, sizeof(maxStrength_str));
-	maxStrength = parse_int(maxStrength_str);
+	len = input_size(maxStrength_str, sizeof(maxStrength_str));
+	maxStrength = parse_int(len, maxStrength_str);
 
-	send(cfd, &fid, sizeof(fid), 0);
-	send(cfd, &name, sizeof(name), 0);
-	send(cfd, &credits, sizeof(credits), 0);
-	send(cfd, &maxStrength, sizeof(maxStrength), 0);
+	send(sfd, &fid, sizeof(fid), 0);
+	send(sfd, &name, sizeof(name), 0);
+	send(sfd, &credits, sizeof(credits), 0);
+	send(sfd, &maxStrength, sizeof(maxStrength), 0);
 
 	int res;
-	recv(cfd, &res, sizeof(res), 0);
+	recv(sfd, &res, sizeof(res), 0);
 
 	if(res == 0) {
 		output("Course added successfully\n");
@@ -425,6 +426,7 @@ int student(int socket_fd) {
 }
 
 int main() {
+	int cfd = 0;
 	/*int cfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server;
    	server.sin_family = AF_INET;
