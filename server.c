@@ -54,6 +54,7 @@ struct Course {
 	int fid;
 	int credits;
 	int maxStrength;
+	int status;
 	int students[100];
 	int studentIdx;
 };
@@ -575,18 +576,301 @@ int add_course(int cfd) {
 }
 
 int remove_course(int cfd) {
+	int cid, fid;
+	recv(cfd, &fid, sizeof(fid), 0);
+	recv(cfd, &cid, sizeof(cid), 0);
+	/*
+		int id;
+		char name[100];
+		int courseStatus
+		int studentIdx;
+		int students[100];
+		int credits;
+		int maxStrength;
+		int fid;
+
+		struct Student {
+			int id;
+			char name[100];
+			char email[100];
+			char password[100];
+			int courseIdx;
+			int courses[100];
+			char status;
+		};
+
+		struct Faculty {
+			int id;
+			char name[100];
+			char email[100];
+			char password[100];
+			int courseIdx;
+			int courses[100];
+			int status;
+		};
+
+		Initial steps:
+			Read course into struct from file
+		IDs are 1-indexed
+		Student steps:
+			1. For each student in students array of course struct:
+				2. Acquire lock
+				3. Move fd to to student_idx
+				4. Re-order student_courses array to remove course
+				5. Update courseIdx
+				6. Release lock
+			
+		Faculty steps:
+			1. Go to faculty in file using fid of course
+			2. Obtain record lock
+			3. Update courses array
+			4. Update coursesIdx
+			5. Release lock
+
+		Course steps:
+			1. Iterate over every record
+				2. Get record lock
+				3. If record found:
+					4. Set status to inactive
+					5. Set studentIdx = 0;
+					6. Clear student array
+					7. Set credits = 0
+					8. Set maxStrength = 0
+					9. Set fid = 0;
+					10. Write course back to file
+				11. Release write lock
+		
+	*/
+
+	struct Course course;
+	int course_fd = open("./data/course", O_RDWR);
+	lseek(course_fd, (cid - 1) * sizeof(course), SEEK_SET);
+	struct flock courseLock;
+	int lock_res = set_lock(course_fd, &courseLock, W_LOCK, SEEK_CUR, 0, sizeof(course));
+	read(course_fd, &course, sizeof(course));
+
+	// Student
+	for(int i = 0; i < course.studentIdx; i++) {
+		int sid = course.studentIdx[i];
+		struct Student student;
+		struct flock studentLock;
+		int student_fd = open("./data/student", O_RDWR);
+		lseek(student_fd, (sid - 1) * sizeof(student_fd), SEEK_SET);
+		int lock_res = set_lock(student_fd, &studentLock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+		read(student_fd, &student, sizeof(student));
+		int j = 0;
+		while(j < student.courseIdx) {
+			if(student.courses == cid) {
+				break;
+			}
+			j++;
+		}
+		int temp = student.courses[j];
+		student.courses[j] = student.courses[student.coursesIdx - 1];
+		lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
+		write(student_fd, &student, sizeof(student));
+		lock_res = set_lock(fd, &studentLock, UNLOCK, SEEK_CUR, 0, sizeof(course));
+	}
+
+	// Faculty
+	struct Faculty faculty;
+	int faculty_fd = open("./data/faculty", O_RDWR);
+	lseek(faculty_fd, (fid - 1) * sizeof(faculty), SEEK_SET);
+	
+	struct flock faculty_lock;
+	lock_res = set_lock(fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+	read(faculty_lock, &faculty, sizeof(faculty));
+	for(int i = 0; i < faculty.courseIdx; i++) {
+		if(faculty.courses[i] == cid) {
+			int temp = faculty.courses[i];
+			faculty.courses[i] = faculty.courses[faculty.courseIdx - 1];
+			break;
+		}
+	}
+	faculty.courseIdx--;
+
+	course.status = 0;
+	course.credits = 0;
+	course.maxStrength = 0;
+	course.fid = 0;
+	for(int i = 0; i < course.studentIdx; i++) {
+		course.student[i] = 0;
+	}
+	course.studentIdx = 0;
+	lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
+	write(course_fd, &course, sizeof(course));
+	lock_res = set_lock(course_fd, &courseLock, UNLOCK, 0, 0);
+
+	int res = 0;
+	send(cfd, &res, sizeof(res), 0);
+
 	return 0;
 }
 
 int view_enrollments(int cfd) {
+	/*
+		Get courseId
+		Read course from file into course struct
+		Iterate over students array from courseStruct
+		If student is active then details will be sent	
+	*/
+	int course_id = -1;
+	recv(cfd, &course_id, sizeof(course_id), 0);
+	// Handle course_id error
+	int course_fd = open("./data/course", O_RDWR);
+	struct Course course;
+	lseek(course_fd, (course_id - 1) * sizeof(course), SEEK_SET);
+	// Handle lseek error
+	struct flock course_lock;
+	int lock_res = set_lock(course_fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
+	// Handle lock error
+	read(course_fd, &course, sizeof(course));
+	// Handle read error
+	
+	// Send the number of students
+	send(cfd, &course.studentIdx, sizeof(course.studentIdx), 0);
+
+	// Iterate over every student
+	int student_fd = open("./data/student", O_RDONLY);
+	for(int i = 0; i < course.studentIdx; i++) {
+		int sid = course.students[i];
+		struct Student student;
+		// Move fd
+		lseek(student_fd, (sid - 1) * sizeof(student), SEEK_SET);
+		struct flock student_lock;
+		lock_res = set_lock(student_fd, &student_lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
+		read(student_fd, &student, sizeof(student));
+
+		// Send id and name
+		char name[100];
+		string_copy(student.name, name);
+		send(cfd, &sid, sizeof(sid), 0);
+		send(cfd, &name, sizeof(name), 0);
+	}
+
 	return 0;
 }
 
 int change_password(int cfd) {
+	/*
+		Get the type, id, and new password
+		Accordingly open the file
+		Move fd to required position
+		Get write lock
+		Read into struct
+		Update password
+		Write struct back to file
+		Release lock
+		Close file
+	*/
+	int type, id;
+	char new_password[100];
+	recv(cfd, &type, sizeof(type), 0);
+	recv(cfd, &id, sizeof(id), 0);
+	recv(cfd, &new_password, sizeof(new_password), 0);
+	
+	if(type == FACULTY) {
+		int fd = open("./data/faculty", O_RDWR);
+		struct Faculty faculty;
+		lseek(fd, (id - 1) * sizeof(faculty), SEEK_SET);
+
+		struct flock lock;
+		int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+		read(fd, &faculty, sizeof(faculty));
+		string_copy(new_password, faculty.password);
+		lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
+		write(fd, &faculty, sizeof(faculty));
+		set_lock(fd, &lock, UNLOCK, 0, 0);
+		
+		int res = 0;
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else if(type == STUDENT) {
+		int fd = open("./data/student", O_RDWR);
+		struct Student student;
+		lseek(fd, (id - 1) * sizeof(student), SEEK_SET);
+
+		struct flock lock;
+		int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+		read(fd, &student, sizeof(student));
+		string_copy(new_password, student.password);
+		lseek(fd, -1 * sizeof(student), SEEK_CUR);
+		write(fd, &student, sizeof(student));
+		set_lock(fd, &lock, UNLOCK, 0, 0);
+
+		int res = 0;
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else {
+		int res = -1;
+		send(cfd, &res, sizeof(res), 0);
+	}
+
 	return 0;
 }
 
 int enroll_course(int cfd) {
+	/*
+		Get student id and course id
+		Get student struct
+		Check if student already in course
+		If not, add student to course
+		Close student
+
+		Get course struct
+		Add student into students array
+		Close course
+
+	*/
+	int sid, cid;
+	recv(cfd, &sid, sizeof(sid), 0);
+	recv(cfd, &cid, sizeof(cid), 0);
+
+	struct Student student;
+	// Open student data
+	int student_fd = open("./data/student", O_RDWR);
+	// Move fd to position
+	lseek(student_fd, (sid - 1) * sizeof(student), SEEK_SET);
+
+	// Lock the record
+	struct flock student_lock;
+	int lock_res = set_lock(student_fd, &student_lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+	read(student_fd, &student, sizeof(student));
+	int already_enrolled = 0;
+	for(int i = 0; i < student.courseIdx; i++) {
+		if(student.courses[i] == cid) {
+			already_enrolled = 1;
+			break;
+		}
+	}
+
+	if(!already_enrolled) {
+		student.courseIdx++;
+		student.courses[courseIdx] = cid;
+		lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
+		write(student_fd, &student, sizeof(student));
+		lock_res = set_lock(student_fd, &student_lock, UNLOCK, SEEK_CUR, 0, 0);
+
+		// Update course
+		int course_fd = open("./data/course", O_RDWR);
+		struct Course course;
+		lseek(course_fd, (cid - 1) * sizeof(course), SEEK_SET);
+		struct flock course_lock;
+		lock_res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
+		read(course_fd, &course, sizeof(course));
+		course.studentIdx++;
+		course.students[courseIdx] = sid;
+		lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
+		write(course_fd, &course, sizeof(course));
+		lock_res = set_lock(course_fd, &course_lock, UNLOCK, SEEK_CUR, 0, 0);
+	}
+	else {
+		lock_res = set_lock(student_fd, &student_lock, UNLOCK, SEEK_CUR, 0, 0);
+	}
+	
+	int res = 0;
+	send(cfd, &res, sizeof(res), 0); 
+
 	return 0;
 }
 
