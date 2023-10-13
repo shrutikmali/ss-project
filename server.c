@@ -875,6 +875,73 @@ int enroll_course(int cfd) {
 }
 
 int unenroll_course(int cfd) {
+	/*
+		Receive cid and sid
+		Get student struct
+		Check if student is enrolled in course
+		Remove course from courses array
+		Write student struct
+
+		Get course struct
+		Remove student from students array
+		Write course struct
+	*/
+	int sid, cid;
+	recv(cfd, &sid, sizeof(sid), 0);
+	recv(cfd, &cid, sizeof(cid), 0);
+
+	int student_fd = open("./data/student", O_RDWR);
+	struct Student student;
+	lseek(student_fd, (sid - 1) * sizeof(student), SEEK_SET);
+	struct flock student_lock;
+	int lock_res = set_lock(student_fd, &student_lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+	read(student_fd, &student, sizeof(student));
+
+	int enrolled_idx = -1;
+	for(int i = 0; i < courseIdx; i++) {
+		if(student.courses[i] == cid) {
+			enrolled_idx = i;
+			break;
+		}
+	}
+	if(enrolled_idx == -1) {
+		lock_res = set_lock(student_fd, &student_lock, UNLOCK, SEEK_CUR, 0, 0);
+		close(student_fd);
+	}
+	else {
+		student.courses[enrolled_idx] = student.courses[student.courseIdx - 1];
+		student.courses[student.courseIdx - 1] = -1;
+		student.courseIdx--;
+		lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
+		write(student_fd, &student, sizeof(student));
+		lock_res = set_lock(student_fd, &student_lock, UNLOCK, SEEK_CUR, 0, 0);
+		close(student_fd);
+
+		// Update course
+		int course_fd = open("./data/course", O_RDWR);
+		struct Course course;
+		lseek(course_fd, (cid - 1) * sizeof(course), SEEK_SET);
+		struct flock course_lock;
+		lock_res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
+		read(course_fd, &course, sizeof(course));
+		int student_idx = -1;
+		for(int i = 0; i < course.studentIdx; i++) {
+			if(course.students[i] == sid) {
+				student_idx = i;
+				break;
+			}
+		}
+
+		course.students[student_idx] = course.students[course.studentIdx - 1];
+		course.students[course.studentIdx - 1] = -1;
+		course.studentIdx--;
+		lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
+		write(course_fd, &course, sizeof(course));
+		lock_res = set_lock(course_fd, &course_lock, UNLOCK, SEEK_CUR, 0, 0);
+	}
+
+	int res = 0;
+	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 
