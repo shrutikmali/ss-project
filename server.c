@@ -970,7 +970,7 @@ int main() {
 	if(cfd == -1) {
 		output("Error accepting client\n");
 	}
-
+	output("Client connected\n");
 	int run = 1;
 	while(run) {
 		char opcode;

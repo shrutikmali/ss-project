@@ -26,13 +26,22 @@ int output(char *buff) {
 	return 0;
 }
 
+void flush_input() {
+	char buff;
+	while(read(0, &buff, sizeof(buff))) {
+		;
+	}
+}
+
 int input_size(char *buff, int size) {
 	memset(&buff, '\0', size);
 	int res = read(0, buff, size);
+	flush_input();
 	return res;
 }
 
 int input(char *buff) {
+	memset(buff, '\0', 100);
 	int size = 0;
 	char c;
 	while(read(0, &c, sizeof(c))) {
@@ -41,6 +50,7 @@ int input(char *buff) {
 			return 0;
 		}
 	}
+	flush_input();
 	return -1;
 }
 
@@ -452,18 +462,17 @@ int student(int socket_fd) {
 }
 
 int main() {
-	int cfd = 0;
-	/*int cfd = socket(AF_INET, SOCK_STREAM, 0);
+	// int cfd = 0;
+	int cfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server;
    	server.sin_family = AF_INET;
     server.sin_port = htons(5000);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
 	int connect_res = connect(cfd, (struct sockaddr*)&server, sizeof(server));
 	if(connect_res == -1) {
-		char connect_error[] = "Error connecting\n";
-        output(connect_error, sizeof(connect_error));
+		output("Error connecting\n");
        	return -1;
-   	}*/
+   	}
 	int run = 1;
 	output("Welcome to Academia Portal\n");
 	while(run) {
