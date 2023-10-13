@@ -46,7 +46,7 @@ int input(char *buff) {
 
 int parse_int(int size, char str[100]) {
 	int num = 0;
-	for(int i = 0; i < size; i++) {
+	for(int i = 0; i < size && '0' <= str[i] && str[i] <= '9'; i++) {
 		num = (num * 10) + (int)(str[i] - '0');
 	}
 	return num;
@@ -219,7 +219,7 @@ int edit_student(int sfd) {
 	return 0;
 }
 
-int status_student(int cfd) {
+int status_student(int sfd) {
 	char id_str[100];
 	output("Enter student id: ");
 	int size = input_size(id_str, sizeof(id_str));
@@ -229,11 +229,11 @@ int status_student(int cfd) {
 	output("Enter 1 to activate or 0 to deactivate: ");
 	input_size(&option_char, 1);
 	int option = (int)(option_char - '0');
-	send(cfd, &id, sizeof(id), 0);
-	send(cfd, &option, sizeof(option), 0);
+	send(sfd, &id, sizeof(id), 0);
+	send(sfd, &option, sizeof(option), 0);
 	
 	int res;
-	recv(cfd, &res, sizeof(res), 0);
+	recv(sfd, &res, sizeof(res), 0);
 	
 	if(res == 1) {
 		output("Status updated\n");
@@ -321,10 +321,24 @@ int add_course(int sfd, int fid) {
 	return res;
 }
 
-int remove_course(int socket_fd, int fid) {
-	char id[100];
+int remove_course(int sfd, int fid) {
+	char id_str[100];
 	output("Enter course id: ");
-	input_size(id, sizeof(id));
+	input_size(id_str, sizeof(id_str));
+	int id = parse_int(100, id_str);
+	send(sfd, &fid, sizeof(fid), 0);
+	send(sfd, &id, sizeof(id), 0);
+
+	int res;
+	recv(sfd, &res, sizeof(res), 0);
+
+	if(res == 0) {
+		output("Course removed successfully\n");
+	}
+	else {
+		output("Server oof'd in removing course\n");
+	}
+
 	return 0;
 }
 
@@ -377,18 +391,30 @@ int faculty(int socket_fd) {
    	return res;
 }
 
-int enroll_course(int socket_fd, int sid) {
-	char id[100];
+int enroll_course(int sfd, int sid) {
+	char cid_str[100];
 	output("Enter course id: ");
-	input_size(id, sizeof(id));
-	return 0;
+	int cid_size = input_size(cid_str, sizeof(cid_str));
+	int cid = parse_int(cid_size, cid_str);
+	send(sfd, &sid, sizeof(sid), 0);
+	send(sfd, &cid, sizeof(cid), 0);
+
+	int res;
+	recv(sfd, &res, sizeof(res), 0);
+
+	return res;
 }
 
-int unenroll_course(int socket_fd, int sid) {
-	char id[100];
-    output("Enter course id: ");
-    input_size(id, sizeof(id));
-	return 0;
+int unenroll_course(int sfd, int sid) {
+	char cid_str[100];
+	output("Enter course id: ");
+	int cid_size = input_size(cid_str, sizeof(cid_str));
+	int cid = parse_int(cid_size, cid_str);
+	send(sfd, &sid, sizeof(sid), 0);
+	send(sfd, &cid, sizeof(cid), 0);
+
+	int res;
+	recv(sfd, &res, sizeof(res), 0);
 }
 
 int student(int socket_fd) {

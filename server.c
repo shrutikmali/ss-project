@@ -651,7 +651,7 @@ int remove_course(int cfd) {
 
 	// Student
 	for(int i = 0; i < course.studentIdx; i++) {
-		int sid = course.studentIdx[i];
+		int sid = course.students[i];
 		struct Student student;
 		struct flock studentLock;
 		int student_fd = open("./data/student", O_RDWR);
@@ -660,16 +660,16 @@ int remove_course(int cfd) {
 		read(student_fd, &student, sizeof(student));
 		int j = 0;
 		while(j < student.courseIdx) {
-			if(student.courses == cid) {
+			if(student.courses[j] == cid) {
 				break;
 			}
 			j++;
 		}
 		int temp = student.courses[j];
-		student.courses[j] = student.courses[student.coursesIdx - 1];
+		student.courses[j] = student.courses[student.courseIdx - 1];
 		lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
 		write(student_fd, &student, sizeof(student));
-		lock_res = set_lock(fd, &studentLock, UNLOCK, SEEK_CUR, 0, sizeof(course));
+		lock_res = set_lock(student_fd, &studentLock, UNLOCK, SEEK_CUR, 0, sizeof(course));
 	}
 
 	// Faculty
@@ -678,8 +678,8 @@ int remove_course(int cfd) {
 	lseek(faculty_fd, (fid - 1) * sizeof(faculty), SEEK_SET);
 	
 	struct flock faculty_lock;
-	lock_res = set_lock(fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
-	read(faculty_lock, &faculty, sizeof(faculty));
+	lock_res = set_lock(faculty_fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+	read(faculty_fd, &faculty, sizeof(faculty));
 	for(int i = 0; i < faculty.courseIdx; i++) {
 		if(faculty.courses[i] == cid) {
 			int temp = faculty.courses[i];
@@ -694,12 +694,12 @@ int remove_course(int cfd) {
 	course.maxStrength = 0;
 	course.fid = 0;
 	for(int i = 0; i < course.studentIdx; i++) {
-		course.student[i] = 0;
+		course.students[i] = 0;
 	}
 	course.studentIdx = 0;
 	lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
 	write(course_fd, &course, sizeof(course));
-	lock_res = set_lock(course_fd, &courseLock, UNLOCK, 0, 0);
+	lock_res = set_lock(course_fd, &courseLock, UNLOCK, SEEK_CUR, 0, 0);
 
 	int res = 0;
 	send(cfd, &res, sizeof(res), 0);
@@ -722,7 +722,7 @@ int view_enrollments(int cfd) {
 	lseek(course_fd, (course_id - 1) * sizeof(course), SEEK_SET);
 	// Handle lseek error
 	struct flock course_lock;
-	int lock_res = set_lock(course_fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
+	int lock_res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
 	// Handle lock error
 	read(course_fd, &course, sizeof(course));
 	// Handle read error
@@ -780,7 +780,7 @@ int change_password(int cfd) {
 		string_copy(new_password, faculty.password);
 		lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
 		write(fd, &faculty, sizeof(faculty));
-		set_lock(fd, &lock, UNLOCK, 0, 0);
+		set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, 0);
 		
 		int res = 0;
 		send(cfd, &res, sizeof(res), 0);
@@ -796,7 +796,7 @@ int change_password(int cfd) {
 		string_copy(new_password, student.password);
 		lseek(fd, -1 * sizeof(student), SEEK_CUR);
 		write(fd, &student, sizeof(student));
-		set_lock(fd, &lock, UNLOCK, 0, 0);
+		set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, 0);
 
 		int res = 0;
 		send(cfd, &res, sizeof(res), 0);
@@ -846,7 +846,7 @@ int enroll_course(int cfd) {
 
 	if(!already_enrolled) {
 		student.courseIdx++;
-		student.courses[courseIdx] = cid;
+		student.courses[student.courseIdx] = cid;
 		lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
 		write(student_fd, &student, sizeof(student));
 		lock_res = set_lock(student_fd, &student_lock, UNLOCK, SEEK_CUR, 0, 0);
@@ -859,7 +859,7 @@ int enroll_course(int cfd) {
 		lock_res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
 		read(course_fd, &course, sizeof(course));
 		course.studentIdx++;
-		course.students[courseIdx] = sid;
+		course.students[course.studentIdx] = sid;
 		lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
 		write(course_fd, &course, sizeof(course));
 		lock_res = set_lock(course_fd, &course_lock, UNLOCK, SEEK_CUR, 0, 0);
@@ -898,7 +898,7 @@ int unenroll_course(int cfd) {
 	read(student_fd, &student, sizeof(student));
 
 	int enrolled_idx = -1;
-	for(int i = 0; i < courseIdx; i++) {
+	for(int i = 0; i < student.courseIdx; i++) {
 		if(student.courses[i] == cid) {
 			enrolled_idx = i;
 			break;
