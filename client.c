@@ -38,22 +38,23 @@ int input_size(char *buff, int size) {
 	memset(buff, '\0', size);
 	int res = read(0, buff, size);
 	flush_input();
-	printf("Input read and flushed\n");
 	return res;
 }
 
 int input(char *buff) {
 	int size = 0;
 	char c;
-	while(read(0, &c, sizeof(c))) {
-		buff[size++] = c;
+	while(read(0, &c, sizeof(c)) > 0) {
 		if(c == '\n') {
 			buff[size++] = '\0';
-			return 0;
+			break;
+		}
+		else {
+			buff[size++] = c;
 		}
 	}
-	flush_input();
-	return 0;
+	// flush_input();
+	return size;
 }
 
 int parse_int(int size, char str[100]) {
@@ -111,21 +112,25 @@ int login(int sfd, int type) {
 }
 
 int add_faculty(int sfd) {
+
+	int opcode = 1;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
 	char name[100];
 	char email[100];
 	char password[100];
 	output("Enter name: ");
-	int res = input_size(name, sizeof(name));
+	int res = input(name);
 	output("Enter email: ");
-	res = input_size(email, sizeof(email));
+	res = input(email);
 	output("Enter password: ");
-	res = input_size(password, sizeof(password));
+	res = input(password);
 	send(sfd, &name, sizeof(name), 0);
 	send(sfd, &email, sizeof(email), 0);
 	send(sfd, &password, sizeof(password), 0);
 	
 	recv(sfd, &res, sizeof(res), 0);
-	if(res != 0) {
+	if(res <= 0) {
 		output("Server oof'd in adding faculty\n");
 	}
 	else {
@@ -135,21 +140,25 @@ int add_faculty(int sfd) {
 }
 
 int edit_faculty(int sfd) {
+
+	int opcode = 2;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
 	char id_str[100];
 	output("Enter faculty id: ");
-	int size = input_size(id_str, sizeof(id_str));
+	int size = input(id_str);
 	int id = parse_int(size, id_str);
-	
+	printf("Parsed id: %d\n", id);
 	// Send data to server
 	char name[100];
 	char email[100];
 	char password[100];
 	output("Enter new name: ");
-	int res = input_size(name, sizeof(name));
+	int res = input(name);
 	output("Enter new email: ");
-	res = input_size(email, sizeof(email));
+	res = input(email);
 	output("Enter new password: ");
-	res = input_size(password, sizeof(password));
+	res = input(password);
 	send(sfd, &id, sizeof(id), 0);
 	send(sfd, &name, sizeof(name), 0);
 	send(sfd, &email, sizeof(email), 0);

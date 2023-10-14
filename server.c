@@ -7,6 +7,9 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <errno.h>
+
+extern int errno;
 
 int ADMIN = 1;
 int FACULTY = 2;
@@ -77,8 +80,14 @@ int output(char *buff) {
 
 int set_lock(int fd, struct flock *lock, int type, int whence, int start, int len) {
 	int res;
+	// printf("Lock args:\n%d\n%d\n%d\n%d\n%d\n", fd, type, whence, start, len);
 	if(type == F_UNLCK) {
-		lock->l_type = F_UNLCK;
+		lock->l_type = type;
+		lock->l_whence = whence;
+		lock->l_start = start;
+		lock->l_len = len;
+		lock->l_pid = getpid();
+		// printf("Boolean check: %d\n", lock->l_type == F_UNLCK);
 		res = fcntl(fd, F_SETLK, lock);
 	}
 	else {
@@ -87,7 +96,11 @@ int set_lock(int fd, struct flock *lock, int type, int whence, int start, int le
 		lock->l_start = start;
 		lock->l_len = len;
 		lock->l_pid = getpid();
-		res = fcntl(fd, F_SETLK, lock);
+		res = fcntl(fd, F_SETLKW, lock);
+	}
+	if(res == -1) {
+		perror("Error in locking");
+		printf("Error no: %d\n", errno);
 	}
 	return res;
 }
@@ -111,16 +124,16 @@ int input(char *buff) {
 
 int string_equal(char *s, char *t) {
 	while(*s != '\0' && *t != '\0') {
-		printf("%c %c\n", *s, *t);
+		// printf("%c %c\n", *s, *t);
 		if(*s != *t) {
-			printf("Not equal inside loop %c %c\n", *s, *t);
+			// printf("Not equal inside loop %c %c\n", *s, *t);
 			return 0;
 		}
 		s++;
 		t++;
 	}
 	if((*s != '\n' && *t != '\n') && (*s == '\0' && *t != '\0' || *s != '\0' && *t == '\0')) {
-		printf("Not equal outside loop %c %c\n", *s, *t);
+		// printf("Not equal outside loop %c %c\n", *s, *t);
 		return 0;
 	}
 	return 1;
@@ -134,15 +147,24 @@ void string_copy(char src[100], char dest[100]) {
 }
 
 int get_id(int type) {
+	// printf("Getting id\n");
 	int fd = open("./data/id", O_RDWR);
+	if(fd < 0) {
+		perror("Error in opening ids");
+		return -1;
+	}
 	struct flock lock;
 	int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_SET, 0, 0);
 	if(lock_res == -1) {
-		output("Error locking:get_id\n");
+		perror("Error in locking ids file");
 		return -1;
 	}
 	struct id_count ids;
-	read(fd, &ids, sizeof(ids));
+	int read_res = read(fd, &ids, sizeof(ids));
+	if(read_res < 0) {
+		perror("Error in reading ids");
+		return -1;
+	}
 	int returnID = -1;
 	if(type == ADMIN) {
 		returnID = ids.admin;
@@ -162,9 +184,10 @@ int get_id(int type) {
 	}
 	lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	if(lock_res == -1) {
-		output("Error unlocking:get_id\n");
+		perror("Error in unlocking ids");
 		returnID = -1;
 	}
+	// printf("Getting id complete\n");
 	return returnID;
 }
 		
@@ -201,7 +224,7 @@ int login(int cfd) {
 			int user_found = 0;
 			lseek(fd, SEEK_SET, 0);
 			while(read(fd, &admin, sizeof(admin)) > 0) {
-				printf("Credentials: %s %s\n", admin.email, admin.password);
+				// printf("Credentials: %s %s\n", admin.email, admin.password);
 				int email_match = string_equal(email, admin.email); 
 				if(email_match) {
 					user_found = 1;
@@ -209,14 +232,14 @@ int login(int cfd) {
 				}
 			}
 			if(!user_found) {
-				printf("User found\n");
+				// printf("User found\n");
 				int error = -1;
 				send(cfd, &error, sizeof(error), 0);
 			}
 			else {
 				// Check if password matches
 				int password_match = string_equal(password, admin.password);
-				printf("Password test: %d\n", password_match);
+				// printf("Password test: %d\n", password_match);
 				if(password_match) {
 					send(cfd, &admin.id, sizeof(int), 0);
 					logged_in = 1;
@@ -345,6 +368,8 @@ int login(int cfd) {
 
 int add_faculty(int cfd) {
 	// TODO: add check to see if email already exists
+	printf("CFD is: %d\n", cfd);
+	printf("Adding faculty\n");
 	char name[100];
 	char email[100];
 	char password[100];
@@ -353,9 +378,12 @@ int add_faculty(int cfd) {
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
+
+	// printf("Received data:\n%s\n%s\n%s\n", name, email, password);
 	
 	int newId = get_id(FACULTY);
 	int res = -1;
+	// printf("Received id: %d\n", newId);
 	if(newId == -1) {
 		output("Error getting id:add_faculty\n");
 		res = -1;
@@ -368,20 +396,36 @@ int add_faculty(int cfd) {
 		newFaculty.courseIdx = 0;
 		newFaculty.status = 1;
 		
+		// printf("%s\n%s\n%s\n", newFaculty.name, newFaculty.email, newFaculty.password);
 		
 		int fd = open("./data/faculty", O_WRONLY);
-		int seek_res = lseek(fd, 0, SEEK_END);
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newFaculty));
-		if(lock_res == -1) {
-			output("Error in locking faculty:add_faculty\n");
+		if(fd < 0) {
+			perror("Error in opening faculty");
 			res = -1;
 		}
 		else {
-			res = write(fd, &newFaculty, sizeof(newFaculty));
-			int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
-			if(unlock_res == -1) {
-				output("Error in unlocking faculty:add_faculty\n");
+			int seek_res = lseek(fd, 0, SEEK_END);
+			if(seek_res < 0) {
+				perror("Error in seeking faculty");
+				res = -1;
+			}
+			else {
+				struct flock lock;
+				int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newFaculty));
+				if(lock_res == -1) {
+					perror("Error in locking faculty:add_faculty");
+					res = -1;
+				}
+				else {
+					res = write(fd, &newFaculty, sizeof(newFaculty));
+					int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
+					if(unlock_res == -1) {
+						perror("Error in unlocking faculty:add_faculty");
+					}
+					else {
+						res = newId;
+					}
+				}
 			}
 		}
 	}
@@ -399,36 +443,60 @@ int edit_faculty(int cfd) {
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
 
-	int fd = open("./data/faculty", O_RDWR);
-	struct Faculty faculty;
-	lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
-	struct flock lock;
-	
-	// First get lock
-	int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(faculty));
 	int res = -1;
-	if(lock_res == -1) {
-		output("Error getting read lock:edit_faculty\n");
+	int fd = open("./data/faculty", O_RDWR);
+	if(fd < 0) {
+		perror("Error opening faculty:edit_faculty");
 		res = -1;
-		send(cfd, &res, sizeof(res), 0);
 	}
 	else {
-		// Read into struct
-		read(fd, &faculty, sizeof(faculty));
-		string_copy(name, faculty.name);
-		string_copy(email, faculty.email);
-		string_copy(password, faculty.password);
-		
-		// Write struct back to file
-		lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
-		write(fd, &faculty, sizeof(faculty));
-		lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
-		struct flock lock;
-		lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
-		res = 0;
-		send(cfd, &res, sizeof(res), 0);
+		// printf("FD is: %d\n", fd);
+		struct Faculty faculty;
+		res = lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
+		if(res == -1) {
+			perror("Error seeking:edit_faculty");
+		}
+		else {
+			struct flock lock;
+			
+			// First get lock
+			int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+			if(lock_res == -1) {
+				// printf("Lock args:\n%d\n%d\n%d\n%d\n%lu\n", fd, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+				perror("Error getting write lock:edit_faculty");
+				res = -1;
+			}
+			else {
+				// Read into struct
+				read(fd, &faculty, sizeof(faculty));
+				string_copy(name, faculty.name);
+				string_copy(email, faculty.email);
+				string_copy(password, faculty.password);
+				
+				// Write struct back to file
+				res = lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
+				if(res < 0) {
+					perror("Error in seeking while WB:edit_faculty");
+				}
+				else {
+					write(fd, &faculty, sizeof(faculty));
+					res = lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
+					struct flock lock;
+					// printf("Lock args:\n%d\n%d\n%d\n%d\n%lu\n", fd, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
+					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
+					if(lock_res == -1) {
+						perror("Error releasing write lock:edit_faculty");
+						res = -1;
+					}
+					else {
+						res = 0;
+					}
+				}
+			}
+		}
 	}
-
+	close(fd);
+	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 
