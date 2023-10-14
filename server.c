@@ -42,6 +42,16 @@ struct Student {
 	int status;
 };
 
+
+void student_constructor(struct Student *student) {
+	student->id = 0;
+	memset(student->name, '\0', 100);
+	memset(student->password, '\0', 100);
+	memset(student->courses, '\0', 100);
+	student->courseIdx = 0;
+	student->status = 0;
+}
+
 struct Faculty {
 	int id;
 	char name[100];
@@ -51,6 +61,15 @@ struct Faculty {
 	int courses[100];
 	int status;
 };
+
+void faculty_constructor(struct Faculty *faculty) {
+	faculty->id = 0;
+	memset(faculty->name, '\0', 100);
+	memset(faculty->password, '\0', 100);
+	memset(faculty->courses, '\0', 100);
+	faculty->courseIdx = 0;
+	faculty->status = 0;
+}
 
 struct Course {
 	int id;
@@ -62,6 +81,18 @@ struct Course {
 	int students[100];
 	int studentIdx;
 };
+
+void course_constructor(struct Course *course) {
+	course->id = 0;
+	course->fid = 0;
+	course->credits = 0;
+	course->maxStrength = 0;
+	course->status = 0;
+	course->studentIdx = 0;
+	for(int i = 0; i < 100; i++) {
+		course->students[i] = 0;
+	}
+}
 
 int output_size(char *buff, int size) {
     int res = write(1, buff, size);
@@ -191,259 +222,382 @@ int get_id(int type) {
 	return returnID;
 }
 
-int search(int id, int type, int fd) {
-	int res = -1;
-	if(type == FACULTY) {
-		struct Faculty user;
-		int found = 0, eof = 0;
-		while(!found && !eof) {
-			struct flock lock;
-			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
-			if(lock_res < 0) {
-				perror("Error acquiring lock:search");
-				return -2;
-			}
-			else {
-				int read_res = read(fd, &user, sizeof(user));
-				if(read_res < 0) {
-					eof = 1;
-				}
-				if(user.id == id) {
-					found = 1;
-					res = 1;
-					lseek(fd, -1 * sizeof(user), SEEK_CUR);
-					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
-				}
-			}
-		}
-	}
-	else if(type == STUDENT) {
-		struct Student user;
-		int found = 0, eof = 0;
-		while(!found && !eof) {
-			struct flock lock;
-			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
-			if(lock_res < 0) {
-				perror("Error acquiring lock:search");
-				return -2;
-			}
-			else {
-				int read_res = read(fd, &user, sizeof(user));
-				if(read_res < 0) {
-					eof = 1;
-					return -1;
-				}
-				if(user.id == id) {
-					found = 1;
-					res = 1;
-					lseek(fd, -1 * sizeof(user), SEEK_CUR);
-					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
-				}
-			}
-		}	
-	}
-	else if(type == COURSE) {
-		struct Course user;
-		int found = 0, eof = 0;
-		while(!found && !eof) {
-			struct flock lock;
-			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
-			if(lock_res < 0) {
-				perror("Error acquiring lock:search");
-				return -2;
-			}
-			else {
-				int read_res = read(fd, &user, sizeof(user));
-				if(read_res < 0) {
-					eof = 1;
-					return -1;
-				}
-				if(user.id == id) {
-					found = 1;
-					res = 1;
-					lseek(fd, -1 * sizeof(user), SEEK_CUR);
-					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
-				}
-			}
-		}
-	}
-	else {
-		return -1;
-	}
+int search_admin_email(char email[100], int fd) {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	
+	int res = 0;
+	struct Admin admin;
+	int found = 0, eof = 0;
 
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(admin));
+		if(res < -1) {
+			perror("Error acquiring lock:search_admin_email");
+			break;
+		}
+		memset(admin.email, '\0', 100);
+		int size = read(fd, &admin, sizeof(admin));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(string_equal(admin.email, email)) {
+			found = 1;
+			lseek(fd, -1 * sizeof(admin), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int search_student_id(int id, int fd) {
+
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	
+	int res = 0;
+	struct Student student;
+	int found = 0, eof = 0;
+
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
+		if(res < -1) {
+			perror("Error acquiring lock:search_student");
+			break;
+		}
+		int size = read(fd, &student, sizeof(student));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(student.id == id) {
+			found = 1;
+			lseek(fd, -1 * sizeof(student), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int search_student_email(char email[100], int fd) {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	
+	int res = 0;
+	struct Student student;
+	int found = 0, eof = 0;
+
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
+		if(res < -1) {
+			perror("Error acquiring lock:search_student");
+			break;
+		}
+		memset(student.email, '\0', 100);
+		int size = read(fd, &student, sizeof(student));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(string_equal(email, student.email)) {
+			found = 1;
+			lseek(fd, -1 * sizeof(student), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int search_faculty_id(int id, int fd) {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	int res = 0;
+	struct Faculty faculty;
+	int found = 0, eof = 0;
+
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(faculty));
+		if(res < -1) {
+			perror("Error acquiring lock:search_student");
+			break;
+		}
+		int size = read(fd, &faculty, sizeof(faculty));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(faculty.id == id) {
+			found = 1;
+			lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int search_faculty_email(char email[100], int fd) {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	int res = 0;
+	struct Faculty faculty;
+	int found = 0, eof = 0;
+
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(faculty));
+		if(res < -1) {
+			perror("Error acquiring lock:search_student");
+			break;
+		}
+		memset(faculty.email, '\0', 100);
+		int size = read(fd, &faculty, sizeof(faculty));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(string_equal(faculty.email, email)) {
+			found = 1;
+			lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int search_course_id(int id, int fd) {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+	int res = 0;
+	struct Course course;
+	int found = 0, eof = 0;
+
+	while(!found && !eof) {
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(course));
+		if(res < -1) {
+			perror("Error acquiring lock:search_student");
+			break;
+		}
+		int size = read(fd, &course, sizeof(course));
+		if(size == 0) {
+			res = 0;
+			eof = 1;
+		}
+		else if(course.id == id) {
+			found = 1;
+			lseek(fd, -1 * sizeof(course), SEEK_CUR);
+			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	return res;
+}
+
+int student_login(int cfd) {
+	/*
+		return:
+		id if correct
+		0 if not found
+		-1 if incorrect
+		< -1 if error
+	*/
+	int fd = open("./data/student", O_RDONLY);
+
+	char email[100];
+	char password[100];
+
+	int logged_in = 0;
+	int res = 0;
+	struct Student student;
+
+	while(!logged_in) {
+		memset(email, '\0', 100);
+		memset(password, '\0', 100);
+		lseek(fd, 0, SEEK_SET);
+
+		recv(cfd, &email, sizeof(email), 0);
+		recv(cfd, &password, sizeof(password), 0);
+		
+		int search_res = search_student_email(email, fd);
+		if(search_res == 1) {
+			read(fd, &student, sizeof(student));
+			if(string_equal(password, student.password)) {
+				logged_in = 1;
+				res = 1;
+			}
+			else {
+				res = -1;
+			}
+		}
+		else if(search_res == 0) {
+			res = 0;
+			logged_in = 0;
+		}
+		else {
+			res = -2;
+			logged_in = 0;
+		}
+
+		send(cfd, &res, sizeof(res), 0);
+	}
+	
+	return res;
+}
+
+int faculty_login(int cfd) {
+	/*
+		return:
+		id if correct
+		0 if not found
+		-1 if incorrect
+		< -1 if error
+	*/
+	int fd = open("./data/faculty", O_RDONLY);
+
+	char email[100];
+	char password[100];
+
+	int logged_in = 0;
+	int res = 0;
+	struct Faculty faculty;
+
+	while(!logged_in) {
+		memset(email, '\0', 100);
+		memset(password, '\0', 100);
+		lseek(fd, 0, SEEK_SET);
+
+		recv(cfd, &email, sizeof(email), 0);
+		recv(cfd, &password, sizeof(password), 0);
+		
+		int search_res = search_faculty_email(email, fd);
+		if(search_res == 1) {
+			read(fd, &faculty, sizeof(faculty));
+			if(string_equal(password, faculty.password)) {
+				logged_in = 1;
+				res = 1;
+			}
+			else {
+				res = -1;
+			}
+		}
+		else if(search_res == 0) {
+			res = 0;
+			logged_in = 0;
+		}
+		else {
+			res = -2;
+			logged_in = 0;
+		}
+
+		send(cfd, &res, sizeof(res), 0);
+	}
+	
+	return res;
+}
+
+int admin_login(int cfd) {
+	/*
+		return:
+		id if correct
+		0 if not found
+		-1 if incorrect
+		< -1 if error
+	*/
+	int fd = open("./data/admin", O_RDONLY);
+
+	char email[100];
+	char password[100];
+
+	int logged_in = 0;
+	int res = 0;
+	struct Admin admin;
+
+	while(!logged_in) {
+		memset(email, '\0', 100);
+		memset(password, '\0', 100);
+		lseek(fd, 0, SEEK_SET);
+
+		recv(cfd, &email, sizeof(email), 0);
+		recv(cfd, &password, sizeof(password), 0);
+		
+		int search_res = search_admin_email(email, fd);
+		if(search_res == 1) {
+			read(fd, &admin, sizeof(admin));
+			if(string_equal(password, admin.password)) {
+				logged_in = 1;
+				res = 1;
+			}
+			else {
+				res = -1;
+			}
+		}
+		else if(search_res == 0) {
+			res = 0;
+			logged_in = 0;
+		}
+		else {
+			res = -2;
+			logged_in = 0;
+		}
+
+		send(cfd, &res, sizeof(res), 0);
+	}
+	
 	return res;
 }
 
 int login(int cfd) {
 	int type;
 	recv(cfd, &type, sizeof(type), 0);
-	int logged_in = 0;
-	char email[100];
-	char password[100];
+
 	if(type == ADMIN) {
-		struct Admin admin;
-		// Open admin file
-		int fd = open("./data/admin", O_RDONLY);
-		if(fd == -1) {
-			perror("Error opening file");
-		}
-		// Set read lock
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-		if(lock_res == -1) {
-			perror("Error locking login:admin");
-			int error = -2;
-			send(cfd, &error, sizeof(error), 0);
-			return -1;
-		}
-		
-		
-		while(!logged_in) {
-			// Get credentials
-			recv(cfd, &email, sizeof(email), 0);
-			recv(cfd, &password, sizeof(password), 0);
-			// Check if user exists
-			int user_found = 0;
-			lseek(fd, SEEK_SET, 0);
-			while(read(fd, &admin, sizeof(admin)) > 0) {
-				// printf("Credentials: %s %s\n", admin.email, admin.password);
-				int email_match = string_equal(email, admin.email); 
-				if(email_match) {
-					user_found = 1;
-					break;
-				}
-			}
-			if(!user_found) {
-				// printf("User found\n");
-				int error = -1;
-				send(cfd, &error, sizeof(error), 0);
-			}
-			else {
-				// Check if password matches
-				int password_match = string_equal(password, admin.password);
-				// printf("Password test: %d\n", password_match);
-				if(password_match) {
-					send(cfd, &admin.id, sizeof(int), 0);
-					logged_in = 1;
-				}
-				else {
-					int error = 0;
-					send(cfd, &error, sizeof(error), 0);
-					int unlock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-					if(unlock_res == -1) {
-						output("Error unlocking login:admin\n");
-						return -1;
-					}
-				}
-			}
-		}
+		return admin_login(cfd);
 	}
 	else if(type == FACULTY) {
-		struct Faculty user;
-		// Open faculty file
-		int fd = open("./data/faculty", O_RDONLY);
-		
-		// Set read lock
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-		if(lock_res == -1) {
-			output("Error locking in login\n");
-			int error = -2;
-			send(cfd, &error, sizeof(error), 0);
-			return -1;
-		}
-		
-		
-		while(!logged_in) {
-			// Get credentials
-			recv(cfd, &email, sizeof(email), 0);
-			recv(cfd, &password, sizeof(password), 0);
-			
-			// Check if user exists
-			int user_found = 0;
-			while(!read(fd, &user, sizeof(user))) {
-				if(string_equal(email, user.email)) {
-					user_found = 1;
-					break;
-				}
-			}
-			if(!user_found) {
-				int error = -1;
-				send(cfd, &error, sizeof(error), 0);
-			}
-			else {
-				// Check if password matches
-				if(string_equal(password, user.password)) {
-					send(cfd, &user.id, sizeof(int), 0);
-					logged_in = 1;
-				}
-				else {
-					int error = 0;
-					send(cfd, &error, sizeof(error), 0);
-					int unlock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-					if(unlock_res == -1) {
-						output("Error unlocking login:faculty\n");
-						return -1;
-					}
-				}
-			}
-		}
+		return faculty_login(cfd);
 	}
 	else if(type == STUDENT) {
-		struct Student user;
-		// Open faculty file
-		int fd = open("./data/student", O_RDONLY);
-		
-		// Set read lock
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-		if(lock_res == -1) {
-			output("Error locking in login\n");
-			int error = -2;
-			send(cfd, &error, sizeof(error), 0);
-			return -1;
-		}
-		
-		
-		while(!logged_in) {
-			// Get credentials
-			recv(cfd, &email, sizeof(email), 0);
-			recv(cfd, &password, sizeof(password), 0);
-			
-			// Check if user exists
-			int user_found = 0;
-			while(!read(fd, &user, sizeof(user))) {
-				if(string_equal(email, user.email)) {
-					user_found = 1;
-					break;
-				}
-			}
-			if(!user_found) {
-				int error = -1;
-				send(cfd, &error, sizeof(error), 0);
-			}
-			else {
-				// Check if password matches
-				if(string_equal(password, user.password)) {
-					send(cfd, &user.id, sizeof(int), 0);
-					logged_in = 1;
-				}
-				else {
-					int error = 0;
-					send(cfd, &error, sizeof(error), 0);
-					int unlock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
-					if(unlock_res == -1) {
-						output("Error unlocking login:student\n");
-						return -1;
-					}
-				}
-			}
-		}
-	}
-	else {
-		int error = -2;
-		send(cfd, &error, sizeof(error), 0);
-		return -1;
+		return student_login(cfd);
 	}
 	return 0;
 }
@@ -522,23 +676,20 @@ int get_faculty_details(int cfd) {
 			res = read(fd, &faculty, sizeof(faculty));
 			if(res <= 0) {
 				perror("Error reading record:get_faculty_details");
+				res = -2;
+				send(cfd, &res, sizeof(res), 0);
 			}
 			else {
 				char name[100];
 				char email[100];
 				int status;
-				int courses[100];
 				string_copy(faculty.name, name);
 				string_copy(faculty.email, email);
-				for(int i = 0; i < faculty.courseIdx; i++) {
-					courses[i] = faculty.courses[i];
-				}
 				status = faculty.status;
 				res = 1;
 				send(cfd, &res, sizeof(res), 0);
 				send(cfd, &name, sizeof(name), 0);
 				send(cfd, &email, sizeof(email), 0);
-				send(cfd, &courses, sizeof(courses), 0);
 				send(cfd, &status, sizeof(status), 0);
 			}
 		}
@@ -602,7 +753,8 @@ int add_faculty(int cfd) {
 	char email[100];
 	char password[100];
 	struct Faculty newFaculty;
-	
+	faculty_constructor(&newFaculty);
+
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
@@ -775,7 +927,9 @@ int add_student(int cfd) {
 	char name[100];
 	char email[100];
 	char password[100];
+
 	struct Student newStudent;
+	student_constructor(&newStudent);
 	
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
@@ -784,7 +938,7 @@ int add_student(int cfd) {
 	int newId = get_id(STUDENT);
 	int res = -1;
 	if(newId == -1) {
-		output("Error getting id:add_student\n");
+		perror("Error getting id:add_student");
 		res = -1;
 	}
 	else {
@@ -795,13 +949,12 @@ int add_student(int cfd) {
 		newStudent.courseIdx = 0;
 		newStudent.status = 1;
 		
-		
 		int fd = open("./data/student", O_WRONLY);
 		int seek_res = lseek(fd, 0, SEEK_END);
 		struct flock lock;
 		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newStudent));
 		if(lock_res == -1) {
-			output("Error in locking faculty:add_student\n");
+			perror("Error in locking faculty:add_student\n");
 			res = -1;
 		}
 		else {
@@ -809,6 +962,9 @@ int add_student(int cfd) {
 			int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newStudent));
 			if(unlock_res == -1) {
 				output("Error in unlocking faculty:add_student\n");
+			}
+			else {
+				res = newId;
 			}
 		}
 	}
@@ -821,60 +977,75 @@ int edit_student(int cfd) {
 	char name[100];
 	char email[100];
 	char password[100];
+
+	// Receive data
 	recv(cfd, &id, sizeof(id), 0);
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
 
+	// Open file
 	int fd = open("./data/student", O_RDWR);
-	struct Student student;
-	lseek(fd, sizeof(student) * (id - 1), SEEK_SET);
-	struct flock lock;
-	
-	// First get lock
-	int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(student));
-	int res = -1;
-	if(lock_res == -1) {
-		output("Error getting read lock:edit_faculty\n");
-		res = -1;
-		send(cfd, &res, sizeof(res), 0);
-	}
-	else {
-		// Read into struct
-		read(fd, &student, sizeof(student));
-		string_copy(name, student.name);
-		string_copy(email, student.email);
-		string_copy(password, student.password);
-		
-		// Write struct back to file
-		lseek(fd, sizeof(student) * -1, SEEK_CUR);
-		write(fd, &student, sizeof(student));
-		lseek(fd, sizeof(student) * -1, SEEK_CUR);
-		lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(student));
-		res = 0;
-		send(cfd, &res, sizeof(res), 0);
-	}
+	int res = search(id, STUDENT, fd);
 
-	return 0;
+	if(res > 0) {
+		// First get lock
+		struct Student student;
+		struct flock lock;
+		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(student));
+		if(lock_res == -1) {
+			perror("Error getting read lock:edit_faculty");
+			res = -2;
+		}
+		else {
+			// Read into struct
+			read(fd, &student, sizeof(student));
+
+			// Update fields
+			string_copy(name, student.name);
+			string_copy(email, student.email);
+			string_copy(password, student.password);
+			
+			// Write struct back to file
+			lseek(fd, sizeof(student) * -1, SEEK_CUR);
+			write(fd, &student, sizeof(student));
+			lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+			res = 1;
+		}
+	}
+	
+	close(fd);
+	send(cfd, &res, sizeof(res), 0);
+	return res;
 }
 
 int status_student(int cfd) {
 	int id, option;
 	recv(cfd, &id, sizeof(id), 0);
 	recv(cfd, &option, sizeof(option), 0);
+
+	int res = -2;
+
 	// Open the file
 	int fd = open("./data/student", O_RDWR);
-	struct Student student;
-	lseek(fd, (id - 1) * sizeof(student), SEEK_SET);
-	// Acquire a lock
-	struct flock lock;
-	int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
-	read(fd, &student, sizeof(student));
-	student.status = option;
-	lseek(fd,  -1 * (sizeof(student)), SEEK_CUR);
-	write(fd, &student, sizeof(student));
+	res = search(id, STUDENT, fd);
+	if(res > 0) {
+		struct Student student;
+
+		// Acquire a lock
+		struct flock lock;
+		int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+
+		read(fd, &student, sizeof(student));
+		student.status = option;
+		
+		lseek(fd,  -1 * (sizeof(student)), SEEK_CUR);
+		write(fd, &student, sizeof(student));
+		lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+		res = 1;
+	}
+	
 	close(fd);
-	int res = 1;
 	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
@@ -882,7 +1053,9 @@ int status_student(int cfd) {
 int add_course(int cfd) {
 	struct Course course;
 	struct Faculty faculty;
+
 	char name[100];
+	memset(name, '\0', 100);
 	int credits;
 	int maxStrength;
 	int fid;
