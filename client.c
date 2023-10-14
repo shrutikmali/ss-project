@@ -6,6 +6,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <stdio.h>
 
 int ADMIN = 1;
 int FACULTY = 2;
@@ -27,31 +28,32 @@ int output(char *buff) {
 }
 
 void flush_input() {
-	char buff;
-	while(read(0, &buff, sizeof(buff))) {
-		;
-	}
+    char c;
+    while (read(0, &c, 1) > 0 && c != '\n') {
+		
+    }
 }
 
 int input_size(char *buff, int size) {
-	memset(&buff, '\0', size);
+	memset(buff, '\0', size);
 	int res = read(0, buff, size);
 	flush_input();
+	printf("Input read and flushed\n");
 	return res;
 }
 
 int input(char *buff) {
-	memset(buff, '\0', 100);
 	int size = 0;
 	char c;
 	while(read(0, &c, sizeof(c))) {
 		buff[size++] = c;
 		if(c == '\n') {
+			buff[size++] = '\0';
 			return 0;
 		}
 	}
 	flush_input();
-	return -1;
+	return 0;
 }
 
 int parse_int(int size, char str[100]) {
@@ -63,26 +65,35 @@ int parse_int(int size, char str[100]) {
 }
 
 int login(int sfd, int type) {
+	int opcode = 0;
+	int res = send(sfd, &opcode, sizeof(opcode), 0);
+	if(res == -1) {
+		perror("Error sending opcode");
+	}
 	char email[100];
 	char password[100];
 	int logged_in = 0;
-	int res = send(sfd, &type, sizeof(type), 0);
+	res = send(sfd, &type, sizeof(type), 0);
 	if(res == -1) {
+		perror("Error sending login type");
 		output("Error sending login type\n");
 		return -1;
 	}
 	while(!logged_in) {
 		output("Enter email: ");
-		input_size(email, sizeof(email));
+		// input_size(email, 100);
+		input(email);
 		output("Enter password: ");
-		input_size(password, sizeof(password));
+		// input_size(password, 100);
+		input(password);
 		send(sfd, &email, sizeof(email), 0);
 		send(sfd, &password, sizeof(password), 0);
 		int response;
 		output("Logging in...\n");
 		recv(sfd, &response, sizeof(response), 0);
-		if(response == 0) {
-			output("Incorrect credentials, try again\n");
+		printf("Response: %d\n", response);
+		if(response > 0) {
+			logged_in = response;
 		}
 		else if(response == -1) {
 			output("User not found\n");
@@ -92,11 +103,11 @@ int login(int sfd, int type) {
 			return -1;
 		}
 		else {
-			logged_in = response;
+			output("Incorrect credentials, try again\n");
 		}
 	}
 	output("Logged in successfully!\n");
-	return 0;
+	return logged_in;
 }
 
 int add_faculty(int sfd) {
@@ -264,7 +275,7 @@ int admin(int socket_fd) {
 	int run = 1;
 	int res = -1;
 	while(run) {
-		output("Enter 1 to add faculty\nEnter 2 to edit faculty\n Enter 3 to activate/deactivate faculty\nEnter 4 to add student\nEnter 5 to edit student\nEnter 6 to activate/deactivate student\nEnter 7 to sign out\n");
+		output("Enter 1 to add faculty\nEnter 2 to edit faculty\nEnter 3 to activate/deactivate faculty\nEnter 4 to add student\nEnter 5 to edit student\nEnter 6 to activate/deactivate student\nEnter 7 to sign out\n");
 		char option;
 		input_size(&option, 1);
 		if(option == '1') {
@@ -462,11 +473,10 @@ int student(int socket_fd) {
 }
 
 int main() {
-	// int cfd = 0;
 	int cfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server;
    	server.sin_family = AF_INET;
-    server.sin_port = htons(5000);
+    server.sin_port = htons(5002);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
 	int connect_res = connect(cfd, (struct sockaddr*)&server, sizeof(server));
 	if(connect_res == -1) {
@@ -474,9 +484,11 @@ int main() {
        	return -1;
    	}
 	int run = 1;
+	printf("Socket in main: %d\n", cfd);
 	output("Welcome to Academia Portal\n");
 	while(run) {
 		output("Enter 1 to sign in as admin\nEnter 2 to sign in as faculty\nEnter 3 to sign in as student\nEnter 0 to exit\n");
+		output("Enter your choice: ");
 		char option;
 		input(&option);
 		if(option == '1') {

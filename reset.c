@@ -1,6 +1,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 struct id_count {
 	int admin;
@@ -59,10 +61,12 @@ int main() {
 	ftruncate(fd_admin, 0);
 
 	struct Admin admin;
-	admin.id = 0;
+	admin.id = 1;
 	strcpy(admin.email, "abc@abc.com");
-	strcpy(admin.email, "123");
+	strcpy(admin.password, "123");
 	write(fd_admin, &admin, sizeof(admin));
+
+	printf("Reset complete\n");
 
 	return 0;
 }

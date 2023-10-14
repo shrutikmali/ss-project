@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 
 int ADMIN = 1;
 int FACULTY = 2;
@@ -78,7 +79,7 @@ int set_lock(int fd, struct flock *lock, int type, int whence, int start, int le
 	int res;
 	if(type == F_UNLCK) {
 		lock->l_type = F_UNLCK;
-		res = fcntl(fd, F_SETLK, &lock);
+		res = fcntl(fd, F_SETLK, lock);
 	}
 	else {
 		lock->l_type = type;
@@ -86,7 +87,7 @@ int set_lock(int fd, struct flock *lock, int type, int whence, int start, int le
 		lock->l_start = start;
 		lock->l_len = len;
 		lock->l_pid = getpid();
-		res = fcntl(fd, F_SETLK, &lock);
+		res = fcntl(fd, F_SETLK, lock);
 	}
 	return res;
 }
@@ -110,13 +111,16 @@ int input(char *buff) {
 
 int string_equal(char *s, char *t) {
 	while(*s != '\0' && *t != '\0') {
-		if(s != t) {
+		printf("%c %c\n", *s, *t);
+		if(*s != *t) {
+			printf("Not equal inside loop %c %c\n", *s, *t);
 			return 0;
 		}
 		s++;
 		t++;
 	}
-	if(*s == '\0' && *t != '\0' || *s != '\0' && *t == '\0') {
+	if((*s != '\n' && *t != '\n') && (*s == '\0' && *t != '\0' || *s != '\0' && *t == '\0')) {
+		printf("Not equal outside loop %c %c\n", *s, *t);
 		return 0;
 	}
 	return 1;
@@ -175,12 +179,14 @@ int login(int cfd) {
 		struct Admin admin;
 		// Open admin file
 		int fd = open("./data/admin", O_RDONLY);
-		
+		if(fd == -1) {
+			perror("Error opening file");
+		}
 		// Set read lock
 		struct flock lock;
 		int lock_res = set_lock(fd, &lock, F_RDLCK, SEEK_SET, 0, 0);
 		if(lock_res == -1) {
-			output("Error locking login:admin\n");
+			perror("Error locking login:admin");
 			int error = -2;
 			send(cfd, &error, sizeof(error), 0);
 			return -1;
@@ -191,22 +197,27 @@ int login(int cfd) {
 			// Get credentials
 			recv(cfd, &email, sizeof(email), 0);
 			recv(cfd, &password, sizeof(password), 0);
-			
 			// Check if user exists
 			int user_found = 0;
-			while(!read(fd, &admin, sizeof(admin))) {
-				if(string_equal(email, admin.email)) {
+			lseek(fd, SEEK_SET, 0);
+			while(read(fd, &admin, sizeof(admin)) > 0) {
+				printf("Credentials: %s %s\n", admin.email, admin.password);
+				int email_match = string_equal(email, admin.email); 
+				if(email_match) {
 					user_found = 1;
 					break;
 				}
 			}
 			if(!user_found) {
+				printf("User found\n");
 				int error = -1;
 				send(cfd, &error, sizeof(error), 0);
 			}
 			else {
 				// Check if password matches
-				if(string_equal(password, admin.password)) {
+				int password_match = string_equal(password, admin.password);
+				printf("Password test: %d\n", password_match);
+				if(password_match) {
 					send(cfd, &admin.id, sizeof(int), 0);
 					logged_in = 1;
 				}
@@ -949,7 +960,7 @@ int main() {
 	int sfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server;
     server.sin_family = AF_INET;
-    server.sin_port = htons(5000);
+    server.sin_port = htons(5002);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
     int bind_res = bind(sfd, (struct sockaddr*)&server, sizeof(server));
 
@@ -973,52 +984,53 @@ int main() {
 	output("Client connected\n");
 	int run = 1;
 	while(run) {
-		char opcode;
+		int opcode;
 		recv(cfd, &opcode, sizeof(opcode), 0);
-
+		printf("%d\n", opcode);
 		switch(opcode) {
-			case '0':
+			case 0:
 				login(cfd);
 				break;
-			case '1':
+			case 1:
 				add_faculty(cfd);
 				break;
-			case '2':
+			case 2:
 				edit_faculty(cfd);
 				break;
-			case '3':
+			case 3:
 				status_faculty(cfd);
 				break;
-			case '4':
+			case 4:
 				add_student(cfd);
 				break;
-			case '5':
+			case 5:
 				edit_student(cfd);
 				break;
-			case '6':
+			case 6:
 				status_student(cfd);
 				break;
-			case '7':
+			case 7:
 				add_course(cfd);
 				break;
-			case '8':
+			case 8:
 				remove_course(cfd);
 				break;
-			case '9':
+			case 9:
 				view_enrollments(cfd);
 				break;
-			case 'a':
+			case 10:
 				change_password(cfd);
 				break;
-			case 'b':
+			case 11:
 				enroll_course(cfd);
 				break;
-			case 'c':
+			case 12:
 				unenroll_course(cfd);
 				break;
 			default:
 				break;
 		}
 	}
+	close(cfd);
 	return 0;
 }
