@@ -175,22 +175,26 @@ int edit_faculty(int sfd) {
 }
 
 int status_faculty(int sfd) {
+	int opcode = 3;
+	send(sfd, &opcode, sizeof(opcode), 0);
+	
 	char id_str[100];
 	output("Enter faculty id: ");
-	int size = input_size(id_str, sizeof(id_str));
+	int size = input(id_str);
 	
 	int id = parse_int(size, id_str);
 	char option_char;
 	output("Enter 1 to activate or 0 to deactivate: ");
 	input_size(&option_char, 1);
 	int option = (int)(option - '0');
+
 	send(sfd, &id, sizeof(id), 0);
 	send(sfd, &option, sizeof(option), 0);
 	
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
 	
-	if(res == 1) {
+	if(res > 0) {
 		output("Status updated\n");
 	}
 	else {
