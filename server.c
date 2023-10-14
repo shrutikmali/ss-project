@@ -39,7 +39,7 @@ struct Student {
 	char password[100];
 	int courseIdx;
 	int courses[100];
-	char status;
+	int status;
 };
 
 struct Faculty {
@@ -190,7 +190,89 @@ int get_id(int type) {
 	// printf("Getting id complete\n");
 	return returnID;
 }
-		
+
+int search(int id, int type, int fd) {
+	int res = -1;
+	if(type == FACULTY) {
+		struct Faculty user;
+		int found = 0, eof = 0;
+		while(!found && !eof) {
+			struct flock lock;
+			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
+			if(lock_res < 0) {
+				perror("Error acquiring lock:search");
+				return -2;
+			}
+			else {
+				int read_res = read(fd, &user, sizeof(user));
+				if(read_res < 0) {
+					eof = 1;
+				}
+				if(user.id == id) {
+					found = 1;
+					res = 1;
+					lseek(fd, -1 * sizeof(user), SEEK_CUR);
+					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+				}
+			}
+		}
+	}
+	else if(type == STUDENT) {
+		struct Student user;
+		int found = 0, eof = 0;
+		while(!found && !eof) {
+			struct flock lock;
+			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
+			if(lock_res < 0) {
+				perror("Error acquiring lock:search");
+				return -2;
+			}
+			else {
+				int read_res = read(fd, &user, sizeof(user));
+				if(read_res < 0) {
+					eof = 1;
+					return -1;
+				}
+				if(user.id == id) {
+					found = 1;
+					res = 1;
+					lseek(fd, -1 * sizeof(user), SEEK_CUR);
+					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+				}
+			}
+		}	
+	}
+	else if(type == COURSE) {
+		struct Course user;
+		int found = 0, eof = 0;
+		while(!found && !eof) {
+			struct flock lock;
+			int lock_res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(user));
+			if(lock_res < 0) {
+				perror("Error acquiring lock:search");
+				return -2;
+			}
+			else {
+				int read_res = read(fd, &user, sizeof(user));
+				if(read_res < 0) {
+					eof = 1;
+					return -1;
+				}
+				if(user.id == id) {
+					found = 1;
+					res = 1;
+					lseek(fd, -1 * sizeof(user), SEEK_CUR);
+					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+				}
+			}
+		}
+	}
+	else {
+		return -1;
+	}
+
+	return res;
+}
 
 int login(int cfd) {
 	int type;
@@ -364,6 +446,152 @@ int login(int cfd) {
 		return -1;
 	}
 	return 0;
+}
+
+int get_student_details(int cfd) {
+	int uid;
+	int res = -1;
+	res = recv(cfd, &uid, sizeof(uid), 0);
+	int fd = open("./data/student", O_RDONLY);
+	res = search(uid, STUDENT, fd);
+
+	// Not found (-1) or error
+	if(res < 0) {
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else {
+		struct Student student;
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
+		if(res < -1) {
+			perror("Error locking file:get_student_details");
+			res = -2;
+			send(cfd, &res, sizeof(res), 0);
+		}
+		else {
+			res = read(fd, &student, sizeof(student));
+			if(res <= 0) {
+				perror("Error reading record:get_student_details");
+				res = -2;
+				send(cfd, &res, sizeof(res), 0);
+			}
+			else {
+				char name[100];
+				char email[100];
+				int status;
+				int courses[100];
+				string_copy(student.name, name);
+				string_copy(student.email, email);
+				for(int i = 0; i < student.courseIdx; i++) {
+					courses[i] = student.courses[i];
+				}
+				status = student.status;
+				res = 1;
+				send(cfd, &res, sizeof(res), 0);
+				send(cfd, &name, sizeof(name), 0);
+				send(cfd, &email, sizeof(email), 0);
+				send(cfd, &courses, sizeof(courses), 0);
+				send(cfd, &status, sizeof(status), 0);
+			}
+		}
+	}
+	return res;
+}
+
+int get_faculty_details(int cfd) {
+	int uid;
+	int res = -1;
+	res = recv(cfd, &uid, sizeof(uid), 0);
+	int fd = open("./data/faculty", O_RDONLY);
+	res = search(uid, FACULTY, fd);
+
+	// Not found (-1) or error
+	if(res < 0) {
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else {
+		struct Faculty faculty;
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(faculty));
+		if(res == -1) {
+			perror("Error locking file:get_faculty_details");
+			res = -2;
+			send(cfd, &res, sizeof(res), 0);
+		}
+		else {
+			res = read(fd, &faculty, sizeof(faculty));
+			if(res <= 0) {
+				perror("Error reading record:get_faculty_details");
+			}
+			else {
+				char name[100];
+				char email[100];
+				int status;
+				int courses[100];
+				string_copy(faculty.name, name);
+				string_copy(faculty.email, email);
+				for(int i = 0; i < faculty.courseIdx; i++) {
+					courses[i] = faculty.courses[i];
+				}
+				status = faculty.status;
+				res = 1;
+				send(cfd, &res, sizeof(res), 0);
+				send(cfd, &name, sizeof(name), 0);
+				send(cfd, &email, sizeof(email), 0);
+				send(cfd, &courses, sizeof(courses), 0);
+				send(cfd, &status, sizeof(status), 0);
+			}
+		}
+	}
+	return res;
+}
+
+int get_course_details(int cfd) {
+	int uid;
+	int res = -1;
+	res = recv(cfd, &uid, sizeof(uid), 0);
+	int fd = open("./data/course", O_RDONLY);
+	res = search(uid, COURSE, fd);
+
+	// Not found (-1) or error
+	if(res < 0) {
+		send(cfd, &res, sizeof(res), 0);
+	}
+	else {
+		struct Course course;
+		struct flock lock;
+		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(course));
+		if(res < -1) {
+			perror("Error locking file:get_faculty_details");
+			res = -1;
+		}
+		else {
+			res = read(fd, &course, sizeof(course));
+			if(res <= 0) {
+				perror("Error reading record:get_faculty_details");
+			}
+			else {
+				char name[100];
+				int fid;
+				int credits;
+				int currStrength;
+				int maxStrength;
+				int status;
+				string_copy(course.name, name);
+				status = course.status;
+				res = 1;
+				send(cfd, &res, sizeof(res), 0);
+				send(cfd, &name, sizeof(name), 0);
+				send(cfd, &fid, sizeof(fid), 0);
+				send(cfd, &credits, sizeof(credits), 0);
+				send(cfd, &currStrength, sizeof(currStrength), 0);
+				send(cfd, &maxStrength, sizeof(maxStrength), 0);
+				send(cfd, &status, sizeof(status), 0);
+				return 0;
+			}
+		}
+	}
+	return res;
 }
 
 int add_faculty(int cfd) {
@@ -1115,6 +1343,15 @@ int main() {
 				break;
 			case 12:
 				unenroll_course(cfd);
+				break;
+			case 13:
+				get_student_details(cfd);
+				break;
+			case 14:
+				get_faculty_details(cfd);
+				break;
+			case 15:
+				get_course_details(cfd);
 				break;
 			default:
 				break;
