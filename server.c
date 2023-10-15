@@ -603,212 +603,256 @@ int login(int cfd) {
 }
 
 int get_student_details(int cfd) {
-	int uid;
-	int res = -1;
-	res = recv(cfd, &uid, sizeof(uid), 0);
-	int fd = open("./data/student", O_RDONLY);
-	res = search(uid, STUDENT, fd);
 
-	// Not found (-1) or error
-	if(res < 0) {
-		send(cfd, &res, sizeof(res), 0);
-	}
-	else {
+	/*
+		return:
+		1: if found
+		0: not found
+		-1: error
+	*/
+
+	int uid;
+	int res = 0;
+	int fd = open("./data/student", O_RDONLY);
+
+	recv(cfd, &uid, sizeof(uid), 0);
+	res = search_student_id(uid, fd);
+
+	char name[100];
+	char email[100];
+	int status;
+	
+	if(res > 0) {
 		struct Student student;
+
 		struct flock lock;
 		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
-		if(res < -1) {
+
+		if(res < 0) {
 			perror("Error locking file:get_student_details");
-			res = -2;
-			send(cfd, &res, sizeof(res), 0);
+			res = -1;
 		}
 		else {
 			res = read(fd, &student, sizeof(student));
 			if(res <= 0) {
 				perror("Error reading record:get_student_details");
-				res = -2;
-				send(cfd, &res, sizeof(res), 0);
+				res = -1;
 			}
 			else {
-				char name[100];
-				char email[100];
-				int status;
-				int courses[100];
+				memset(name, '\0', 100);
+				memset(email, '\0', 100);
+				
 				string_copy(student.name, name);
 				string_copy(student.email, email);
-				for(int i = 0; i < student.courseIdx; i++) {
-					courses[i] = student.courses[i];
-				}
 				status = student.status;
+
 				res = 1;
-				send(cfd, &res, sizeof(res), 0);
-				send(cfd, &name, sizeof(name), 0);
-				send(cfd, &email, sizeof(email), 0);
-				send(cfd, &courses, sizeof(courses), 0);
-				send(cfd, &status, sizeof(status), 0);
 			}
 		}
 	}
+
+	send(cfd, &res, sizeof(res), 0);
+	if(res == 1) {
+		send(cfd, &res, sizeof(res), 0);
+		send(cfd, &name, sizeof(name), 0);
+		send(cfd, &email, sizeof(email), 0);
+		send(cfd, &status, sizeof(status), 0);
+	}
+
 	return res;
 }
 
 int get_faculty_details(int cfd) {
 	int uid;
 	int res = -1;
-	res = recv(cfd, &uid, sizeof(uid), 0);
 	int fd = open("./data/faculty", O_RDONLY);
-	res = search(uid, FACULTY, fd);
 
-	// Not found (-1) or error
-	if(res < 0) {
-		send(cfd, &res, sizeof(res), 0);
-	}
-	else {
+	recv(cfd, &uid, sizeof(uid), 0);
+	res = search_faculty_id(uid, fd);
+
+	char name[100];
+	char email[100];
+	int status;
+
+	if(res > 0) {
 		struct Faculty faculty;
+
 		struct flock lock;
 		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(faculty));
-		if(res == -1) {
+
+		if(res < 0) {
 			perror("Error locking file:get_faculty_details");
-			res = -2;
-			send(cfd, &res, sizeof(res), 0);
+			res = -1;
 		}
 		else {
 			res = read(fd, &faculty, sizeof(faculty));
 			if(res <= 0) {
 				perror("Error reading record:get_faculty_details");
-				res = -2;
-				send(cfd, &res, sizeof(res), 0);
+				res = -1;
 			}
 			else {
-				char name[100];
-				char email[100];
-				int status;
+				memset(name, '\0', 100);
+				memset(email, '\0', 100);
+
 				string_copy(faculty.name, name);
 				string_copy(faculty.email, email);
 				status = faculty.status;
 				res = 1;
-				send(cfd, &res, sizeof(res), 0);
-				send(cfd, &name, sizeof(name), 0);
-				send(cfd, &email, sizeof(email), 0);
-				send(cfd, &status, sizeof(status), 0);
 			}
 		}
 	}
+	send(cfd, &res, sizeof(res), 0);
+	if(res == 1) {
+		send(cfd, &res, sizeof(res), 0);
+		send(cfd, &name, sizeof(name), 0);
+		send(cfd, &email, sizeof(email), 0);
+		send(cfd, &status, sizeof(status), 0);
+	}
+
 	return res;
 }
 
 int get_course_details(int cfd) {
 	int uid;
 	int res = -1;
-	res = recv(cfd, &uid, sizeof(uid), 0);
 	int fd = open("./data/course", O_RDONLY);
-	res = search(uid, COURSE, fd);
+
+	char name[100];
+	int fid;
+	int credits;
+	int currStrength;
+	int maxStrength;
+	int status;
+
+	recv(cfd, &uid, sizeof(uid), 0);
+	res = search_course_id(uid, fd);
 
 	// Not found (-1) or error
-	if(res < 0) {
-		send(cfd, &res, sizeof(res), 0);
-	}
-	else {
+	if(res > 0) {
 		struct Course course;
 		struct flock lock;
+
 		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(course));
-		if(res < -1) {
+		if(res < 0) {
 			perror("Error locking file:get_faculty_details");
 			res = -1;
 		}
 		else {
 			res = read(fd, &course, sizeof(course));
+
 			if(res <= 0) {
 				perror("Error reading record:get_faculty_details");
+				res = -1;
 			}
 			else {
-				char name[100];
-				int fid;
-				int credits;
-				int currStrength;
-				int maxStrength;
-				int status;
+				memset(name, '\0', 100);
+
 				string_copy(course.name, name);
+				fid = course.fid;
+				credits = course.credits;
+				currStrength = course.studentIdx;
+				maxStrength = course.maxStrength;
 				status = course.status;
-				res = 1;
-				send(cfd, &res, sizeof(res), 0);
-				send(cfd, &name, sizeof(name), 0);
-				send(cfd, &fid, sizeof(fid), 0);
-				send(cfd, &credits, sizeof(credits), 0);
-				send(cfd, &currStrength, sizeof(currStrength), 0);
-				send(cfd, &maxStrength, sizeof(maxStrength), 0);
-				send(cfd, &status, sizeof(status), 0);
-				return 0;
+				res = 1;	
 			}
 		}
 	}
+	
+	send(cfd, &res, sizeof(res), 0);
+
+	if(res > 0) {
+		send(cfd, &res, sizeof(res), 0);
+		send(cfd, &name, sizeof(name), 0);
+		send(cfd, &fid, sizeof(fid), 0);
+		send(cfd, &credits, sizeof(credits), 0);
+		send(cfd, &currStrength, sizeof(currStrength), 0);
+		send(cfd, &maxStrength, sizeof(maxStrength), 0);
+		send(cfd, &status, sizeof(status), 0);
+	}
+
 	return res;
 }
 
 int add_faculty(int cfd) {
 	// TODO: add check to see if email already exists
-	printf("CFD is: %d\n", cfd);
-	printf("Adding faculty\n");
 	char name[100];
 	char email[100];
 	char password[100];
 	struct Faculty newFaculty;
 	faculty_constructor(&newFaculty);
 
+	memset(name, '\0', 100);
+	memset(email, '\0', 100);
+	memset(password, '\0', 100);
+
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
 
 	// printf("Received data:\n%s\n%s\n%s\n", name, email, password);
-	
-	int newId = get_id(FACULTY);
-	int res = -1;
-	// printf("Received id: %d\n", newId);
-	if(newId == -1) {
-		output("Error getting id:add_faculty\n");
+	int res = 0;
+	int fd = open("./data/faculty", O_RDONLY);
+	int email_collision = search_faculty_email(email, fd);
+	close(fd);
+
+	if(email_collision == -1) {
 		res = -1;
 	}
+	else if(email_collision == 1) {
+		res = 0;
+	}
 	else {
-		newFaculty.id = newId;
-		string_copy(name, newFaculty.name);
-		string_copy(email, newFaculty.email);
-		string_copy(password, newFaculty.password);
-		newFaculty.courseIdx = 0;
-		newFaculty.status = 1;
-		
-		// printf("%s\n%s\n%s\n", newFaculty.name, newFaculty.email, newFaculty.password);
-		
-		int fd = open("./data/faculty", O_WRONLY);
-		if(fd < 0) {
-			perror("Error in opening faculty");
+		int newId = get_id(FACULTY);
+		int res = -1;
+		// printf("Received id: %d\n", newId);
+		if(newId == -1) {
+			output("Error getting id:add_faculty\n");
 			res = -1;
 		}
 		else {
-			int seek_res = lseek(fd, 0, SEEK_END);
-			if(seek_res < 0) {
-				perror("Error in seeking faculty");
+			newFaculty.id = newId;
+			string_copy(name, newFaculty.name);
+			string_copy(email, newFaculty.email);
+			string_copy(password, newFaculty.password);
+			newFaculty.courseIdx = 0;
+			newFaculty.status = 1;
+			
+			// printf("%s\n%s\n%s\n", newFaculty.name, newFaculty.email, newFaculty.password);
+			
+			fd = open("./data/faculty", O_WRONLY);
+			if(fd < 0) {
+				perror("Error in opening faculty");
 				res = -1;
 			}
 			else {
-				struct flock lock;
-				int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newFaculty));
-				if(lock_res == -1) {
-					perror("Error in locking faculty:add_faculty");
+				int seek_res = lseek(fd, 0, SEEK_END);
+				if(seek_res < 0) {
+					perror("Error in seeking faculty");
 					res = -1;
 				}
 				else {
-					res = write(fd, &newFaculty, sizeof(newFaculty));
-					int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
-					if(unlock_res == -1) {
-						perror("Error in unlocking faculty:add_faculty");
+					struct flock lock;
+					int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newFaculty));
+					if(lock_res == -1) {
+						perror("Error in locking faculty:add_faculty");
+						res = -1;
 					}
 					else {
-						res = newId;
+						res = write(fd, &newFaculty, sizeof(newFaculty));
+						int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
+						if(unlock_res == -1) {
+							perror("Error in unlocking faculty:add_faculty");
+							res = -1;
+						}
+						else {
+							res = newId;
+						}
 					}
 				}
 			}
 		}
 	}
+
 	send(cfd, &res, sizeof(res), 0);
 	return res;
 }
@@ -818,71 +862,91 @@ int edit_faculty(int cfd) {
 	char name[100];
 	char email[100];
 	char password[100];
+
+
+	memset(name, '\0', 100);
+	memset(email, '\0', 100);
+	memset(password, '\0', 100);
+
 	recv(cfd, &id, sizeof(id), 0);
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
 
-	int res = -1;
 	int fd = open("./data/faculty", O_RDWR);
+	int res = 0;
+
 	if(fd < 0) {
 		perror("Error opening faculty:edit_faculty");
 		res = -1;
 	}
 	else {
-		// printf("FD is: %d\n", fd);
-		struct Faculty faculty;
-		res = lseek(fd, sizeof(faculty) * (id - 1), SEEK_SET);
-		if(res == -1) {
-			perror("Error seeking:edit_faculty");
+		int email_collision = search_faculty_email(email, fd);
+
+		if(email_collision == -1) {
+			res = -1;
+		}
+		else if(email_collision == 1) {
+			res = 0;
 		}
 		else {
-			struct flock lock;
-			
-			// First get lock
-			int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
-			if(lock_res == -1) {
-				// printf("Lock args:\n%d\n%d\n%d\n%d\n%lu\n", fd, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
-				perror("Error getting write lock:edit_faculty");
-				res = -1;
-			}
-			else {
-				// Read into struct
-				read(fd, &faculty, sizeof(faculty));
-				string_copy(name, faculty.name);
-				string_copy(email, faculty.email);
-				string_copy(password, faculty.password);
+			struct Faculty faculty;
+			res = search_faculty_id(id, fd);
+
+			if(res > 0) {
+				struct flock lock;
 				
-				// Write struct back to file
-				res = lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
-				if(res < 0) {
-					perror("Error in seeking while WB:edit_faculty");
+				// First get lock
+				int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+				if(lock_res == -1) {
+					perror("Error getting write lock:edit_faculty");
+					res = -1;
 				}
 				else {
-					write(fd, &faculty, sizeof(faculty));
-					res = lseek(fd, sizeof(faculty) * -1, SEEK_CUR);
-					struct flock lock;
-					// printf("Lock args:\n%d\n%d\n%d\n%d\n%lu\n", fd, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
-					lock_res = set_lock(fd, &lock, UNLOCK, SEEK_CUR, 0, sizeof(faculty));
-					if(lock_res == -1) {
-						perror("Error releasing write lock:edit_faculty");
-						res = -1;
+					// Read into struct
+					read(fd, &faculty, sizeof(faculty));
+
+					string_copy(name, faculty.name);
+					string_copy(email, faculty.email);
+					string_copy(password, faculty.password);
+					
+					// Write struct back to file
+					res = lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
+					if(res < 0) {
+						perror("Error in seeking while WB:edit_faculty");
 					}
 					else {
-						res = 0;
+						write(fd, &faculty, sizeof(faculty));
+
+						lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+						if(lock_res == -1) {
+							perror("Error releasing write lock:edit_faculty");
+							res = -1;
+						}
+						else {
+							res = 1;
+						}
 					}
 				}
 			}
 		}
+		close(fd);
 	}
-	close(fd);
+	
 	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 
 int status_faculty(int cfd) {
+	/*
+		return:
+		1: done
+		0: not found
+		-1: error
+	*/
 	int id, option;
 	int res = -1;
+
 	recv(cfd, &id, sizeof(id), 0);
 	recv(cfd, &option, sizeof(option), 0);
 
@@ -894,80 +958,94 @@ int status_faculty(int cfd) {
 	}
 	else {
 		struct Faculty faculty;
-		lseek(fd, (id - 1) * sizeof(faculty), SEEK_SET);
-
-		// Acquire a lock
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
-		if(lock_res < 0) {
-			perror("Error acquiring lock:status_faculty");
-			res = -1;
-		}
-		else {
-			read(fd, &faculty, sizeof(faculty));
-			faculty.status = option;
-			lseek(fd, -1 * (sizeof(faculty)), SEEK_CUR);
-			write(fd, &faculty, sizeof(faculty));
-			lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+		res = search_faculty_id(id, fd);
+		if(res > 0) {
+			// Acquire a lock
+			struct flock lock;
+			int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
 			if(lock_res < 0) {
-				perror("Error releasing lock:status_faculty");
+				perror("Error acquiring lock:status_faculty");
+				res = -1;
 			}
 			else {
-				res = faculty.id;
+				read(fd, &faculty, sizeof(faculty));
+				faculty.status = option;
+				lseek(fd, -1 * (sizeof(faculty)), SEEK_CUR);
+				write(fd, &faculty, sizeof(faculty));
+				lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+				if(lock_res < 0) {
+					perror("Error releasing lock:status_faculty");
+				}
+				else {
+					res = 1;
+				}
 			}
 		}
 	}
+	
 	close(fd);
 	send(cfd, &res, sizeof(res), 0);
 	return 0;
 }
 
 int add_student(int cfd) {
-	// TODO: add check to see if email already exists
 	char name[100];
 	char email[100];
 	char password[100];
-
 	struct Student newStudent;
 	student_constructor(&newStudent);
 	
+	memset(name, '\0', 100);
+	memset(email, '\0', 100);
+	memset(password, '\0', 100);
+
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &email, sizeof(email), 0);
 	recv(cfd, &password, sizeof(password), 0);
+
+	int res = 0;
+	int fd = open("./data/student", O_RDONLY);
+	res = search_student_email(email, fd);
+	close(fd);
 	
-	int newId = get_id(STUDENT);
-	int res = -1;
-	if(newId == -1) {
-		perror("Error getting id:add_student");
-		res = -1;
-	}
-	else {
-		newStudent.id = newId;
-		string_copy(name, newStudent.name);
-		string_copy(email, newStudent.email);
-		string_copy(password, newStudent.password);
-		newStudent.courseIdx = 0;
-		newStudent.status = 1;
-		
-		int fd = open("./data/student", O_WRONLY);
-		int seek_res = lseek(fd, 0, SEEK_END);
-		struct flock lock;
-		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newStudent));
-		if(lock_res == -1) {
-			perror("Error in locking faculty:add_student\n");
+	if(res == 0) {
+		int newId = get_id(STUDENT);
+		if(newId == -1) {
+			perror("Error getting id:add_student");
 			res = -1;
 		}
 		else {
-			res = write(fd, &newStudent, sizeof(newStudent));
-			int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newStudent));
-			if(unlock_res == -1) {
-				output("Error in unlocking faculty:add_student\n");
+			newStudent.id = newId;
+			string_copy(name, newStudent.name);
+			string_copy(email, newStudent.email);
+			string_copy(password, newStudent.password);
+			newStudent.courseIdx = 0;
+			newStudent.status = 1;
+			
+			fd = open("./data/student", O_WRONLY);
+			int seek_res = lseek(fd, 0, SEEK_END);
+
+			struct flock lock;
+			int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newStudent));
+			if(lock_res == -1) {
+				perror("Error in locking faculty:add_student\n");
+				res = -1;
 			}
 			else {
-				res = newId;
+				res = write(fd, &newStudent, sizeof(newStudent));
+				int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_SET, 0, 0);
+				if(unlock_res == -1) {
+					output("Error in unlocking faculty:add_student\n");
+					res = -1;
+				}
+				else {
+					res = 1;
+				}
 			}
 		}
 	}
+
+	close(fd);
 	send(cfd, &res, sizeof(res), 0);
 	return res;
 }
@@ -978,6 +1056,10 @@ int edit_student(int cfd) {
 	char email[100];
 	char password[100];
 
+	memset(name, '\0', 100);
+	memset(email, '\0', 100);
+	memset(password, '\0', 100);
+
 	// Receive data
 	recv(cfd, &id, sizeof(id), 0);
 	recv(cfd, &name, sizeof(name), 0);
@@ -986,7 +1068,7 @@ int edit_student(int cfd) {
 
 	// Open file
 	int fd = open("./data/student", O_RDWR);
-	int res = search(id, STUDENT, fd);
+	int res = search_student_id(id, fd);
 
 	if(res > 0) {
 		// First get lock
@@ -994,8 +1076,8 @@ int edit_student(int cfd) {
 		struct flock lock;
 		int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(student));
 		if(lock_res == -1) {
-			perror("Error getting read lock:edit_faculty");
-			res = -2;
+			perror("Error getting read lock:edit_student");
+			res = -1;
 		}
 		else {
 			// Read into struct
@@ -1028,7 +1110,8 @@ int status_student(int cfd) {
 
 	// Open the file
 	int fd = open("./data/student", O_RDWR);
-	res = search(id, STUDENT, fd);
+	res = search_student_id(id, fd);
+
 	if(res > 0) {
 		struct Student student;
 
@@ -1051,28 +1134,60 @@ int status_student(int cfd) {
 }
 
 int add_course(int cfd) {
-	struct Course course;
-	struct Faculty faculty;
-
 	char name[100];
-	memset(name, '\0', 100);
 	int credits;
 	int maxStrength;
 	int fid;
+	
+	memset(name, '\0', 100);
+	
 	recv(cfd, &fid, sizeof(fid), 0);
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &credits, sizeof(credits), 0);
 	recv(cfd, &maxStrength, sizeof(maxStrength), 0);
-	course.id = get_id(COURSE);
+	
+	struct Course new_course;
+	course_constructor(&new_course);
+	
+	int cid = get_id(COURSE);
+	course.id = cid;
 	course.fid = fid;
 	course.maxStrength = maxStrength;
 	course.credits = credits;
 	string_copy(name, course.name);
-	course.studentIdx = 0;
 
-	int res = 0;
+	int fd = open("./data/course", O_RDWR);
+	lseek(fd, SEEK_END, 0);
+
+	struct flock course_lock;
+	res = set_lock(fd, &course_lock, W_LOCK, SEEK_SET, 0, sizeof(new_course));
+	if(res >= 0) {
+		write(fd, &new_course, sizeof(new_course));
+		res = set_lock(fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
+		close(fd);
+
+		if(res >= 0) {	
+			fd = open("./data/faculty", O_RDWR);
+			struct Faculty faculty;
+			res = search_faculty_id(fid, fd);			
+			if(res > 0) {
+				struct flock faculty_lock;
+				res = set_lock(fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+
+				read(fd, &faculty, sizeof(faculty));
+				faculty.courseIdx++;
+				faculty.courses[faculty.courseIdx] = cid;
+				lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
+				write(fd, &faculty, sizeof(faculty));
+
+				set_lock(fd, &faculty_lock, UNLOCK, SEEK_SET, 0, 0);
+				int res = 1;
+			}
+		}
+	}
+
+
 	send(cfd, &res, sizeof(res), 0);
-
 	return 0;
 }
 
