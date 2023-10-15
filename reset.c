@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define MAX_LEN 100
+
 struct id_count {
 	int admin;
 	int student;
@@ -13,38 +15,38 @@ struct id_count {
 
 struct Admin {
 	int id;
-	char email[100];
-	char password[100];
+	char email[MAX_LEN];
+	char password[MAX_LEN];
 };
 
 struct Student {
 	int id;
-	char name[100];
-	char email[100];
-	char password[100];
+	char name[MAX_LEN];
+	char email[MAX_LEN];
+	char password[MAX_LEN];
 	int courseIdx;
-	int courses[100];
+	int courses[MAX_LEN];
 	char status;
 };
 
 struct Faculty {
 	int id;
-	char name[100];
-	char email[100];
-	char password[100];
+	char name[MAX_LEN];
+	char email[MAX_LEN];
+	char password[MAX_LEN];
 	int courseIdx;
-	int courses[100];
+	int courses[MAX_LEN];
 	int status;
 };
 
 struct Course {
 	int id;
-	char name[100];
+	char name[MAX_LEN];
 	int fid;
 	int credits;
 	int maxStrength;
 	int status;
-	int students[100];
+	int students[MAX_LEN];
 	int studentIdx;
 };
 
@@ -65,6 +67,13 @@ int main() {
 	strcpy(admin.email, "abc@abc.com");
 	strcpy(admin.password, "123");
 	write(fd_admin, &admin, sizeof(admin));
+
+	struct id_count ids;
+	ids.admin = 1;
+	ids.student = 1;
+	ids.faculty = 1;
+	ids.course = 1;
+	write(fd_id, &ids, sizeof(ids));
 
 	printf("Reset complete\n");
 
