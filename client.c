@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define MAX_LEN 100
+
 int ADMIN = 1;
 int FACULTY = 2;
 int STUDENT = 3;
@@ -71,6 +73,7 @@ int login(int sfd, int type) {
 	if(res == -1) {
 		perror("Error sending opcode");
 	}
+
 	char email[100];
 	char password[100];
 
@@ -98,14 +101,14 @@ int login(int sfd, int type) {
 		int response;
 		output("Logging in...\n");
 		recv(sfd, &response, sizeof(response), 0);
-		printf("Response: %d\n", response);
+
 		if(response > 0) {
 			logged_in = response;
 		}
-		else if(response == -1) {
+		else if(response == 0) {
 			output("User not found\n");
 		}
-		else if(response == -2) {
+		else if(response < -1) {
 			output("Server oof'd while logging in\n");
 			return -1;
 		}
@@ -113,6 +116,7 @@ int login(int sfd, int type) {
 			output("Incorrect credentials, try again\n");
 		}
 	}
+	
 	output("Logged in successfully!\n");
 	return logged_in;
 }
@@ -125,6 +129,7 @@ int add_faculty(int sfd) {
 	char name[100];
 	char email[100];
 	char password[100];
+	
 	memset(name, '\0', 100);
 	memset(email, '\0', 100);
 	memset(password, '\0', 100);
@@ -135,17 +140,23 @@ int add_faculty(int sfd) {
 	res = input(email);
 	output("Enter password: ");
 	res = input(password);
+
 	send(sfd, &name, sizeof(name), 0);
 	send(sfd, &email, sizeof(email), 0);
 	send(sfd, &password, sizeof(password), 0);
 	
 	recv(sfd, &res, sizeof(res), 0);
-	if(res <= 0) {
+
+	if(res == -2) {
 		output("Server oof'd in adding faculty\n");
+	}
+	else if(res == -1) {
+		output("Email already exists\n");
 	}
 	else {
 		output("Faculty created\n");
 	}
+
 	return res;
 }
 
@@ -183,11 +194,18 @@ int edit_faculty(int sfd) {
 	send(sfd, &password, sizeof(password), 0);
 	
 	recv(sfd, &res, sizeof(res), 0);
-	if(res != 0) {
-		output("Server oof'd in editing faculty\n");
+
+	if(res > 0) {
+		output("Faculty edited\n");
+	}
+	else if(res == 0) {
+		output("Faculty not found\n");
+	}
+	else if(res == -1) {
+		output("Email already exists\n");
 	}
 	else {
-		output("Faculty edited\n");
+		output("Server oof'd in editing faculty\n");
 	}
 	return res;
 }
@@ -198,6 +216,7 @@ int status_faculty(int sfd) {
 	
 	char id_str[100];
 	memset(id_str, '\0', 100);
+
 	output("Enter faculty id: ");
 	int size = input(id_str);
 	int id = parse_int(size, id_str);
@@ -216,19 +235,23 @@ int status_faculty(int sfd) {
 	if(res > 0) {
 		output("Status updated\n");
 	}
+	else if(res == 0) {
+		output("Faculty not found\n");
+	}
 	else {
 		output("Server oof'd while changing status\n");
 	}	
 	
-	return 0;
+	return res;
 }
 
 int get_faculty_details(int sfd) {
-	int opcode = 14;
+	int opcode = 15;
 	send(sfd, &opcode, sizeof(opcode), 0);
 	
 	char fid_str[100];
 	memset(fid_str, '\0', 100);
+	
 	output("Enter faculty id: ");
 	int size  = input(fid_str);
 	int fid = parse_int(size, fid_str);
@@ -238,11 +261,13 @@ int get_faculty_details(int sfd) {
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
 	if(res == 1) {
+		int status;
 		char name[100];
 		char email[100];
+		
 		memset(name, '\0', 100);
 		memset(email, '\0', 100);
-		int status;
+		
 		recv(sfd, &name, sizeof(name), 0);
 		recv(sfd, &email, sizeof(email), 0);
 		recv(sfd, &status, sizeof(status), 0);
@@ -273,12 +298,12 @@ int add_student(int sfd) {
 	int opcode = 4;
 	send(sfd, &opcode, sizeof(opcode), 0);
 
-	char name[100];
-	char email[100];
-	char password[100];
-	memset(name, '\0', 100);
-	memset(email, '\0', 100);
-	memset(password, '\0', 100);
+	char name[MAX_LEN];
+	char email[MAX_LEN];
+	char password[MAX_LEN];
+	memset(name, '\0', sizeof(name));
+	memset(email, '\0', sizeof(email));
+	memset(password, '\0', sizeof(password));
 
 	output("Enter name: ");
 	int res = input_size(name, sizeof(name));
@@ -290,19 +315,26 @@ int add_student(int sfd) {
 	res = input_size(password, sizeof(password));
 
 	recv(sfd, &res, sizeof(res), 0);
-	if(res <= 0) {
-		output("Server oof'd in adding student\n");
+	if(res > 0) {
+		output("New student added sucessfully\n");
+	}
+	if(res == -1) {
+		output("Email already exists\n");
 	}
 	else {
-		output("Student added successfully\n");
+		output("Server oof'd in adding student\n");
 	}
 
 	return res;
 }
 
 int edit_student(int sfd) {
+	int opcode = 5;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
 	char id_str[100];
 	memset(id_str, '\0', 100);
+
 	output("Enter student id: ");
 	int size = input_size(id_str, sizeof(id_str));
 	int id = parse_int(size, id_str);
@@ -310,6 +342,7 @@ int edit_student(int sfd) {
 	char name[100];
 	char email[100];
 	char password[100];
+
 	memset(name, '\0', 100);
 	memset(email, '\0', 100);
 	memset(password, '\0', 100);
@@ -333,8 +366,11 @@ int edit_student(int sfd) {
 	if(res > 0) {
 		output("Student edited\n");
 	}
-	else if(res == -1) {
+	else if(res == 0) {
 		output("Student not found\n");
+	}
+	else if(res == -1) {
+		output("Email already exists\n");
 	}
 	else {
 		output("Server oof'd in editing student\n");
@@ -378,7 +414,7 @@ int status_student(int sfd) {
 }
 
 int get_student_details(int sfd) {
-	int opcode = 13;
+	int opcode = 14;
 	send(sfd, &opcode, sizeof(opcode), 0);
 	
 	char sid_str[100];
@@ -467,18 +503,27 @@ int admin(int socket_fd) {
 }
 
 int add_course(int sfd, int fid) {
-	// Declare course fields
+	int opcode = 7;
+	send(sfd, &opcode, sizeof(opcode), 0);
 
 	char name[100];
+	char credits_str[100];
 	int credits;
+	char maxStrength_str[100];
 	int maxStrength;
+
+	memset(name, '\0', sizeof(name));
+	memset(credits_str, '\0', sizeof(credits_str));
+	memset(maxStrength_str, '\0', sizeof(maxStrength_str));
+
+
 	output("Enter course name: ");
 	int len = input_size(name, sizeof(name));
-	char credits_str[100];
+	
 	output("Enter credits: ");
 	len = input_size(credits_str, sizeof(credits_str));
 	credits = parse_int(len, credits_str);
-	char maxStrength_str[100];
+	
 	output("Enter maximum class size: ");
 	len = input_size(maxStrength_str, sizeof(maxStrength_str));
 	maxStrength = parse_int(len, maxStrength_str);
@@ -491,7 +536,7 @@ int add_course(int sfd, int fid) {
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
 
-	if(res == 0) {
+	if(res == 1) {
 		output("Course added successfully\n");
 	}
 	else {
@@ -502,37 +547,105 @@ int add_course(int sfd, int fid) {
 }
 
 int remove_course(int sfd, int fid) {
+	int opcode = 8;
+	send(sfd, &opcode, sizeof(opcode), 0);
+	
 	char id_str[100];
+
+	memset(id_str, '\0', sizeof(id_str));
+
 	output("Enter course id: ");
 	input_size(id_str, sizeof(id_str));
 	int id = parse_int(100, id_str);
+	
 	send(sfd, &fid, sizeof(fid), 0);
 	send(sfd, &id, sizeof(id), 0);
 
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
 
-	if(res == 0) {
+	if(res == 1) {
 		output("Course removed successfully\n");
+	}
+	else if(res == 0) {
+		output("Course not found\n");
 	}
 	else {
 		output("Server oof'd in removing course\n");
 	}
 
-	return 0;
+	return res;
 }
 
-int view_enrollments(int socket_fd, int fid) {
+int view_enrollments(int sfd, int fid) {
+	int opcode = 9;
+	send(sfd, &opcode, sizeof(opcode), 0);
+	
+	char id_str[100];
+
+	memset(id_str, '\0', sizeof(id_str));
+
 	output("Enter course id: ");
-	char id[100];
-	input_size(id, sizeof(id));
+	input_size(id_str, sizeof(id_str));
+	int id = parse_int(100, id_str);
+
+	send(sfd, &id, sizeof(id), 0);
+
+	output("Enrolled students are:\n");
+	while(1) {
+		int res;
+		recv(sfd, &res, sizeof(res), 0);
+		if(res != 0) {
+			int id;
+			char name[100];
+
+			memset(name, '\0', sizeof(res));
+
+			recv(sfd, &id, sizeof(id), 0);
+			recv(sfd, &name, sizeof(name), 0);
+
+			output(name);
+			output("\n");
+		}
+		else {
+			break;
+		}
+	}
+
 	return 0;
 }
 
-int change_password(int socket_fd, int id, int user) {
+int change_password(int sfd, int id, int user) {
 	char password[100];
+	memset(password, '\0', sizeof(password));
+
 	output("Enter new password: ");
 	input_size(password, sizeof(password));
+
+	int opcode;
+	if(user == STUDENT) {
+		opcode = 11;
+	}
+	else {
+		opcode = 10;
+	}
+	
+	send(sfd, &opcode, sizeof(opcode), 0);
+
+	send(sfd, &id, sizeof(id), 0);
+	send(sfd, &password, sizeof(password), 0);
+
+	int res;
+	recv(sfd, &res, sizeof(res), 0);
+	if(res == 1) {
+		output("Password changed successfully\n");
+	}
+	else if(res == 0) {
+		output("User not found\n");
+	}
+	else {
+		output("Server oof'd in changing password\n");
+	}
 	return 0;
 }
 
@@ -572,29 +685,62 @@ int faculty(int socket_fd) {
 }
 
 int enroll_course(int sfd, int sid) {
+	int opcode = 12;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
 	char cid_str[100];
+	memset(cid_str, '\0', sizeof(cid_str));
+	
 	output("Enter course id: ");
 	int cid_size = input_size(cid_str, sizeof(cid_str));
 	int cid = parse_int(cid_size, cid_str);
+	
+
 	send(sfd, &sid, sizeof(sid), 0);
 	send(sfd, &cid, sizeof(cid), 0);
 
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
+
+	if(res > 0) {
+		output("Enrolled successfully\n");
+	}
+	else if(res == 0) {
+		output("Reached course enrollment limit\n");
+	}
+	else {
+		output("Server oof'd in enrolling course\n");
+	}
 
 	return res;
 }
 
 int unenroll_course(int sfd, int sid) {
+	int opcode = 13;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
 	char cid_str[100];
+	memset(cid_str, '\0', sizeof(cid_str));
+
 	output("Enter course id: ");
 	int cid_size = input_size(cid_str, sizeof(cid_str));
 	int cid = parse_int(cid_size, cid_str);
+
 	send(sfd, &sid, sizeof(sid), 0);
 	send(sfd, &cid, sizeof(cid), 0);
 
 	int res;
 	recv(sfd, &res, sizeof(res), 0);
+
+	if(res > 0) {
+		output("Course unenrolled successfully\n");
+	}
+	else if(res == 0) {
+		output("Course/Student not found\n");
+	}
+	else {
+		output("Server oof'd in unenrolling course\n");
+	}
 }
 
 int student(int socket_fd) {
@@ -666,5 +812,7 @@ int main() {
 			output("Invalid option, try again\n");
 		}
 	}
+
+	close(cfd);
 	return 0;
 }
