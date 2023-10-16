@@ -207,25 +207,30 @@ int get_id(int type) {
 	int returnID = -1;
 	if(type == ADMIN) {
 		returnID = ids.admin;
-		ids.admin++; 
+		ids.admin = ids.admin + 1; 
 	}
 	else if(type == FACULTY) {
 		returnID = ids.faculty;
-		ids.faculty++;
+		ids.faculty = ids.faculty + 1;
 	}
 	else if(type == STUDENT) {
 		returnID = ids.student;
-		ids.student++;
+		ids.student = ids.student + 1;
 	}
 	else if(type == COURSE) {
 		returnID = ids.course;
-		ids.course++;
+		ids.course = ids.course + 1;
 	}
+	printf("Admin new ID: %d\n", ids.admin);
+	printf("Faculty new ID: %d\n", ids.faculty);
+	printf("Student new ID: %d\n", ids.student);
+	printf("Course new ID: %d\n", ids.course);
+
+	lseek(fd, 0, SEEK_SET);
+	write(fd, &ids, sizeof(ids));
+
 	lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
-	if(lock_res == -1) {
-		perror("Error in unlocking ids");
-		returnID = -1;
-	}
+	close(fd);
 
 	return returnID;
 }
@@ -258,9 +263,9 @@ int search_admin_email(char email[MAX_LEN], int fd) {
 		else if(string_equal(admin.email, email)) {
 			found = 1;
 			lseek(fd, -1 * sizeof(admin), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	}
 	
 	return res;
@@ -281,24 +286,31 @@ int search_student_id(int id, int fd) {
 
 	while(!found && !eof) {
 		struct flock lock;
+		student_constructor(&student);
+		printf("Student search: Waiting for lock\n");
 		res = set_lock(fd, &lock, R_LOCK, SEEK_CUR, 0, sizeof(student));
+		printf("Student search: Acquired lock %d\n", res);
 		if(res < -1) {
 			perror("Error acquiring lock:search_student_id");
 			break;
 		}
+		printf("Reading next student\n");
 		int size = read(fd, &student, sizeof(student));
-		if(size == 0) {
+		printf("Student read\n");
+		if(size <= 0) {
 			res = 0;
 			eof = 1;
 		}
 		else if(student.id == id) {
+			printf("Student found\n");
 			found = 1;
 			lseek(fd, -1 * sizeof(student), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
+		printf("Student search: Lock released\n");
 	}
-	
+	printf("Search complete\n");
 	return res;
 }
 
@@ -330,9 +342,9 @@ int search_student_email(char email[MAX_LEN], int fd) {
 		else if(string_equal(email, student.email)) {
 			found = 1;
 			lseek(fd, -1 * sizeof(student), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	}
 	
 	return res;
@@ -365,9 +377,9 @@ int search_faculty_id(int id, int fd) {
 		else if(faculty.id == id) {
 			found = 1;
 			lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	}
 	
 	return res;
@@ -401,9 +413,9 @@ int search_faculty_email(char email[MAX_LEN], int fd) {
 		else if(string_equal(faculty.email, email)) {
 			found = 1;
 			lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	}
 	
 	return res;
@@ -436,9 +448,9 @@ int search_course_id(int id, int fd) {
 		else if(course.id == id) {
 			found = 1;
 			lseek(fd, -1 * sizeof(course), SEEK_CUR);
-			set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
 		}
+		set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 	}
 	
 	return res;
@@ -464,7 +476,6 @@ int student_login(int cfd) {
 	while(!logged_in) {
 		memset(email, '\0', 100);
 		memset(password, '\0', 100);
-		lseek(fd, 0, SEEK_SET);
 
 		recv(cfd, &email, sizeof(email), 0);
 		recv(cfd, &password, sizeof(password), 0);
@@ -668,7 +679,6 @@ int get_student_details(int cfd) {
 	close(fd);
 	send(cfd, &res, sizeof(res), 0);
 	if(res == 1) {
-		send(cfd, &res, sizeof(res), 0);
 		send(cfd, &name, sizeof(name), 0);
 		send(cfd, &email, sizeof(email), 0);
 		send(cfd, &status, sizeof(status), 0);
@@ -832,34 +842,27 @@ int add_faculty(int cfd) {
 			
 			// printf("%s\n%s\n%s\n", newFaculty.name, newFaculty.email, newFaculty.password);
 			
-			fd = open("./data/faculty", O_WRONLY);
-			if(fd < 0) {
-				perror("Error in opening faculty");
+			int seek_res = lseek(fd, 0, SEEK_END);
+			if(seek_res < 0) {
+				perror("Error in seeking faculty");
 				res = -2;
 			}
 			else {
-				int seek_res = lseek(fd, 0, SEEK_END);
-				if(seek_res < 0) {
-					perror("Error in seeking faculty");
+				struct flock lock;
+				int lock_res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(newFaculty));
+				if(lock_res == -1) {
+					perror("Error in locking faculty:add_faculty");
 					res = -2;
 				}
 				else {
-					struct flock lock;
-					int lock_res = set_lock(fd, &lock, F_WRLCK, SEEK_CUR, 0, sizeof(newFaculty));
-					if(lock_res == -1) {
-						perror("Error in locking faculty:add_faculty");
+					res = write(fd, &newFaculty, sizeof(newFaculty));
+					int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
+					if(unlock_res == -1) {
+						perror("Error in unlocking faculty:add_faculty");
 						res = -2;
 					}
 					else {
-						res = write(fd, &newFaculty, sizeof(newFaculty));
-						int unlock_res = set_lock(fd, &lock, F_UNLCK, SEEK_CUR, 0, sizeof(newFaculty));
-						if(unlock_res == -1) {
-							perror("Error in unlocking faculty:add_faculty");
-							res = -2;
-						}
-						else {
-							res = newId;
-						}
+						res = newId;
 					}
 				}
 			}
@@ -1024,6 +1027,7 @@ int add_student(int cfd) {
 	
 	if(res == 0) {
 		int newId = get_id(STUDENT);
+		printf("New id: %d\n", newId);
 		if(newId == -1) {
 			perror("Error getting id:add_student");
 			res = -1;
@@ -1181,6 +1185,7 @@ int add_course(int cfd) {
 	recv(cfd, &name, sizeof(name), 0);
 	recv(cfd, &credits, sizeof(credits), 0);
 	recv(cfd, &maxStrength, sizeof(maxStrength), 0);
+
 	
 	struct Course new_course;
 	course_constructor(&new_course);
@@ -1191,38 +1196,49 @@ int add_course(int cfd) {
 	new_course.maxStrength = maxStrength;
 	new_course.credits = credits;
 	string_copy(name, new_course.name);
+	printf("Max strength: %d\n", new_course.maxStrength);
 
 	int fd = open("./data/course", O_RDWR);
-	lseek(fd, SEEK_END, 0);
 
-	struct flock course_lock;
-	res = set_lock(fd, &course_lock, W_LOCK, SEEK_SET, 0, sizeof(new_course));
-	if(res >= 0) {
+	if(fd > 0) {
+		lseek(fd, 0, SEEK_END);
+		struct flock lock;
+		res = set_lock(fd, &lock, W_LOCK, SEEK_CUR, 0, sizeof(new_course));
+
 		write(fd, &new_course, sizeof(new_course));
-		res = set_lock(fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
+
+		res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 		close(fd);
 
-		if(res >= 0) {	
-			fd = open("./data/faculty", O_RDWR);
-			struct Faculty faculty;
-			res = search_faculty_id(fid, fd);			
-			if(res > 0) {
-				struct flock faculty_lock;
-				res = set_lock(fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
+		fd = open("./data/faculty", O_RDWR);
+		if(fd > 0) {
+			res = search_faculty_id(fid, fd);
 
+			if(res > 0) {
+				struct Faculty faculty;
+				struct flock faculty_lock;
+
+				set_lock(fd, &faculty_lock, W_LOCK, SEEK_CUR, 0, sizeof(faculty));
 				read(fd, &faculty, sizeof(faculty));
+
 				faculty.courseIdx++;
 				faculty.courses[faculty.courseIdx] = cid;
+
 				lseek(fd, -1 * sizeof(faculty), SEEK_CUR);
 				write(fd, &faculty, sizeof(faculty));
-
 				set_lock(fd, &faculty_lock, UNLOCK, SEEK_SET, 0, 0);
-				int res = 1;
+
+				res = 1;
 			}
 			close(fd);
 		}
+		else {
+			res = -1;
+		}
 	}
-
+	else {
+		res = -1;
+	}
 
 	send(cfd, &res, sizeof(res), 0);
 	return 0;
@@ -1236,14 +1252,16 @@ int remove_course(int cfd) {
 	int course_fd = open("./data/course", O_RDWR);
 
 	res = search_course_id(cid, course_fd);
+	printf("Search res is: %d\n", res);
 
 	if(res > 0) {
 		struct Course course;
 		struct flock course_lock;
 
-		res = set_lock(course_fd, &course_lock, R_LOCK, SEEK_CUR, 0, sizeof(course));
+		res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
 		read(course_fd, &course, sizeof(course));
-		set_lock(course_fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
+
+		printf("Res of locking is: %d\n", res);
 
 		// Handle students
 		int student_fd = open("./data/student", O_RDWR);
@@ -1272,14 +1290,14 @@ int remove_course(int cfd) {
 				set_lock(student_fd, &student_lock, UNLOCK, SEEK_SET, 0, 0);
 			}
 		}
-		
+		printf("Students handled\n");
 		close(student_fd);
 
 		// Handle faculty
 		int fid = course.fid;
 		int faculty_fd = open("./data/faculty", O_RDWR);
 		res = search_faculty_id(fid, faculty_fd);
-		
+		printf("Res of faculty search: %d\n", res);
 		if(res > 0) {
 			struct Faculty faculty;
 			struct flock faculty_lock;
@@ -1304,15 +1322,18 @@ int remove_course(int cfd) {
 			set_lock(faculty_fd, &faculty_lock, UNLOCK, SEEK_SET, 0, 0);
 		}
 
+		printf("Faculty handled\n");
 		close(faculty_fd);
 
 		// Handle course
 		lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
 		course_constructor(&course);
 		write(course_fd, &course, sizeof(course));
+		res = set_lock(course_fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
 		close(course_fd);
 
 		res = 1;
+		printf("Course handled\n");
 	}
 
 	send(cfd, &res, sizeof(res), 0);
@@ -1373,7 +1394,7 @@ int change_student_password(int cfd) {
 
 	recv(cfd, &student_id, sizeof(student_id), 0);
 	recv(cfd, &new_password, sizeof(new_password), 0);
-
+	printf("Received password: %s\n", new_password);
 	int student_fd = open("./data/student", O_RDWR);
 	res = search_student_id(student_id, student_fd);
 
@@ -1387,6 +1408,8 @@ int change_student_password(int cfd) {
 			string_copy(new_password, student.password);
 			lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
 			write(student_fd, &student, sizeof(student));
+
+			printf("New password: %s\n", student.password);
 
 			set_lock(student_fd, &student_lock, UNLOCK, SEEK_SET, 0, 0);
 			res = 1;
@@ -1437,18 +1460,21 @@ int enroll_course(int cfd) {
 	recv(cfd, &sid, sizeof(sid), 0);
 	recv(cfd, &cid, sizeof(cid), 0);
 
+	printf("Received student id: %d\n", sid);
+	printf("Received course id: %d\n", cid);
+
 	int res = 0;
 
 	int course_fd = open("./data/course", O_RDWR);
 	res = search_course_id(cid, course_fd);
-
+	printf("Result of course search: %d\n", res);
 	if(res > 0) {
 		struct Course course;
 		struct flock course_lock;
 		
 		set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
 		read(course_fd, &course, sizeof(course));
-
+		printf("Course is: %d\n", course.id);
 		int already_enrolled = 0;
 		for(int i = 0; i <= course.studentIdx; i++) {
 			if(course.students[i] == sid) {
@@ -1456,30 +1482,37 @@ int enroll_course(int cfd) {
 				break;
 			}
 		}
+		printf("Already enrolled: %d\n", already_enrolled);
 		if(already_enrolled == 0) {
+			printf("Not enrolled\n");
+			printf("Course maxStrength: %d\n", course.maxStrength);
+			printf("Course studentIdx: %d\n", course.studentIdx);
 			if(1 + course.studentIdx <= course.maxStrength) {
-				course.studentIdx++;
+				printf("Student eligible\n");
 				course.students[course.studentIdx] = sid;
+				course.studentIdx++;
 
 				lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
 				write(course_fd, &course, sizeof(course));
 				res = 1;
 			}
 			else {
+				printf("Course full\n");
 				res = 0;
 			}
-
-			set_lock(course_fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
-			close(course_fd);
-
+			printf("Course part done with res: %d\n", res);
 			if(res > 0) {
+				printf("Doing student\n");
 				int student_fd = open("./data/student", O_RDWR);
-				res = search_student_id(student_fd, sid);
+				printf("Student file opened\n");
+				res = search_student_id(sid, student_fd);
+				printf("Student search res: %d\n", res);
 				if(res > 0) {
 					struct Student student;
 					struct flock student_lock;
-					
+					printf("Getting lock\n");
 					set_lock(student_fd, &student_lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
+					printf("Got lock\n");
 					read(student_fd, &student, sizeof(student));
 
 					if(student.courseIdx + 1 < 100) {
@@ -1488,19 +1521,24 @@ int enroll_course(int cfd) {
 						
 						lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
 						write(student_fd, &student, sizeof(student));
-						set_lock(student_fd, &student_lock, UNLOCK, SEEK_SET, 0, 0);
 						res = 1;
+						printf("Student enrolled\n");
 					}
 					else {
 						res = 0;
 					}
+					set_lock(student_fd, &student_lock, UNLOCK, SEEK_SET, 0, 0);
+					printf("Student lock released\n");
 				}
 				close(student_fd);
+				printf("Student part done\n");
 			}
 		}
 		else {
 			res = 1;
 		}
+		set_lock(course_fd, &course_lock, UNLOCK, SEEK_SET, 0, 0);
+		close(course_fd);
 	}
 	
 	send(cfd, &res, sizeof(res), 0);
@@ -1518,46 +1556,50 @@ int unenroll_course(int cfd) {
 	res = search_student_id(sid, student_fd);
 
 	if(res > 0) {
+		printf("Student found\n");
 		struct flock student_lock;
 		int lock_res = set_lock(student_fd, &student_lock, W_LOCK, SEEK_CUR, 0, sizeof(student));
 		read(student_fd, &student, sizeof(student));
 
 		int enrolled_idx = -1;
-		for(int i = 0; i < student.courseIdx; i++) {
+		for(int i = 0; i <= student.courseIdx; i++) {
 			if(student.courses[i] == cid) {
 				enrolled_idx = i;
 				break;
 			}
 		}
-
+		printf("Enrolled idx: %d\n", enrolled_idx);
 		if(enrolled_idx != -1) {
-			student.courses[enrolled_idx] = student.courses[student.courseIdx - 1];
-			student.courses[student.courseIdx - 1] = -1;
+			printf("Student is enrolled\n");
+			student.courses[enrolled_idx] = student.courses[student.courseIdx];
+			student.courses[student.courseIdx] = -1;
 			student.courseIdx--;
 
 			lseek(student_fd, -1 * sizeof(student), SEEK_CUR);
 			write(student_fd, &student, sizeof(student));
 
 			res = 1;
-
+			output("Student part done\n");
 			int course_fd = open("./data/course", O_RDWR);
 			struct Course course;
 			res = search_course_id(cid, course_fd);
 			if(res > 0) {
+				printf("Course found\n");
 				struct flock course_lock;
 				lock_res = set_lock(course_fd, &course_lock, W_LOCK, SEEK_CUR, 0, sizeof(course));
 				read(course_fd, &course, sizeof(course));
 				
 				int student_idx = -1;
-				for(int i = 0; i < course.studentIdx; i++) {
+				for(int i = 0; i <= course.studentIdx; i++) {
 					if(course.students[i] == sid) {
 						student_idx = i;
 						break;
 					}
 				}
 				if(student_idx != -1) {
-					course.students[student_idx] = course.students[course.studentIdx - 1];
-					course.students[course.studentIdx - 1] = -1;
+					printf("Student in course array\n");
+					course.students[student_idx] = course.students[course.studentIdx];
+					course.students[course.studentIdx] = -1;
 					course.studentIdx--;
 					lseek(course_fd, -1 * sizeof(course), SEEK_CUR);
 					write(course_fd, &course, sizeof(course));
@@ -1565,6 +1607,7 @@ int unenroll_course(int cfd) {
 					res = 1;
 				}
 				else {
+					printf("Student not in course array\n");
 					res = 0;
 				}
 
@@ -1668,10 +1711,13 @@ int main() {
 			case 16:
 				get_course_details(cfd);
 				break;
+			case -1:
+				run = 0;
+				close(cfd);
+				break;
 			default:
 				break;
 		}
 	}
-	close(cfd);
 	return 0;
 }

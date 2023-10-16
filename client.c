@@ -224,7 +224,7 @@ int status_faculty(int sfd) {
 	char option_char;
 	output("Enter 1 to activate or 0 to deactivate: ");
 	input_size(&option_char, 1);
-	int option = (int)(option - '0');
+	int option = (int)(option_char - '0');
 
 	send(sfd, &id, sizeof(id), 0);
 	send(sfd, &option, sizeof(option), 0);
@@ -301,18 +301,23 @@ int add_student(int sfd) {
 	char name[MAX_LEN];
 	char email[MAX_LEN];
 	char password[MAX_LEN];
+
 	memset(name, '\0', sizeof(name));
 	memset(email, '\0', sizeof(email));
 	memset(password, '\0', sizeof(password));
 
 	output("Enter name: ");
-	int res = input_size(name, sizeof(name));
+	int res = input(name);
 
 	output("Enter email: ");
-	res = input_size(email, sizeof(email));
+	res = input(email);
 
 	output("Enter password: ");
-	res = input_size(password, sizeof(password));
+	res = input(password);
+
+	send(sfd, &name, sizeof(name), 0);
+	send(sfd, &email, sizeof(email), 0);
+	send(sfd, &password, sizeof(password), 0);
 
 	recv(sfd, &res, sizeof(res), 0);
 	if(res > 0) {
@@ -336,7 +341,7 @@ int edit_student(int sfd) {
 	memset(id_str, '\0', 100);
 
 	output("Enter student id: ");
-	int size = input_size(id_str, sizeof(id_str));
+	int size = input(id_str);
 	int id = parse_int(size, id_str);
 	
 	char name[100];
@@ -348,13 +353,13 @@ int edit_student(int sfd) {
 	memset(password, '\0', 100);
 
 	output("Enter new name: ");
-	int res = input_size(name, sizeof(name));
+	int res = input(name);
 
 	output("Enter new email: ");
-	res = input_size(email, sizeof(email));
+	res = input(email);
 
 	output("Enter new password: ");
-	res = input_size(password, sizeof(password));
+	res = input(password);
 
 	// Send data to server
 	send(sfd, &id, sizeof(id), 0);
@@ -386,7 +391,7 @@ int status_student(int sfd) {
 	char id_str[100];
 	memset(id_str, '\0', sizeof(id_str));
 	output("Enter student id: ");
-	int size = input_size(id_str, sizeof(id_str));
+	int size = input(id_str);
 	int id = parse_int(size, id_str);
 	
 	char option_char;
@@ -418,6 +423,9 @@ int get_student_details(int sfd) {
 	send(sfd, &opcode, sizeof(opcode), 0);
 	
 	char sid_str[100];
+	memset(sid_str, '\0', sizeof(sid_str));
+
+	output("Enter student id: ");
 	int size  = input(sid_str);
 	int sid = parse_int(size, sid_str);
 
@@ -460,13 +468,15 @@ int admin(int socket_fd) {
 	if(id == -1) {
 		return -1;
 	}
+	output("\n");
 	output("Welcome to admin\n");
 	int run = 1;
 	int res = -1;
 	while(run) {
-		output("Enter 1 to add faculty\nEnter 2 to edit faculty\nEnter 3 to activate/deactivate faculty\nEnter 4 to get faculty details\nEnter 5 to add student\nEnter 6 to edit student\nEnter 7 to activate/deactivate student\nEnter 8 to get student details\nEnter 0 to sign out\n");
+		output("Enter 1 to add faculty\nEnter 2 to edit faculty\nEnter 3 to activate/deactivate faculty\nEnter 4 to get faculty details\nEnter 5 to add student\nEnter 6 to edit student\nEnter 7 to activate/deactivate student\nEnter 8 to get student details\nEnter 0 to sign out\nEnter your option: ");
 		char option;
 		input_size(&option, 1);
+		output("\n");
 		if(option == '1') {
 			res = add_faculty(socket_fd);
 		}
@@ -498,6 +508,7 @@ int admin(int socket_fd) {
 		else {
 			output("Invalid option, try again\n");
 		}
+		output("------------------------------------------------\n");
 	}
 	return res;
 }
@@ -516,17 +527,18 @@ int add_course(int sfd, int fid) {
 	memset(credits_str, '\0', sizeof(credits_str));
 	memset(maxStrength_str, '\0', sizeof(maxStrength_str));
 
-
 	output("Enter course name: ");
-	int len = input_size(name, sizeof(name));
+	int len = input(name);
 	
 	output("Enter credits: ");
-	len = input_size(credits_str, sizeof(credits_str));
+	len = input(credits_str);
 	credits = parse_int(len, credits_str);
 	
 	output("Enter maximum class size: ");
-	len = input_size(maxStrength_str, sizeof(maxStrength_str));
+	len = input(maxStrength_str);
 	maxStrength = parse_int(len, maxStrength_str);
+
+	printf("Max strength is: %d\n", maxStrength);
 
 	send(sfd, &fid, sizeof(fid), 0);
 	send(sfd, &name, sizeof(name), 0);
@@ -555,9 +567,9 @@ int remove_course(int sfd, int fid) {
 	memset(id_str, '\0', sizeof(id_str));
 
 	output("Enter course id: ");
-	input_size(id_str, sizeof(id_str));
+	input(id_str);
 	int id = parse_int(100, id_str);
-	
+	printf("Id is: %d\n", id);
 	send(sfd, &fid, sizeof(fid), 0);
 	send(sfd, &id, sizeof(id), 0);
 
@@ -586,8 +598,8 @@ int view_enrollments(int sfd, int fid) {
 	memset(id_str, '\0', sizeof(id_str));
 
 	output("Enter course id: ");
-	input_size(id_str, sizeof(id_str));
-	int id = parse_int(100, id_str);
+	int size = input(id_str);
+	int id = parse_int(size, id_str);
 
 	send(sfd, &id, sizeof(id), 0);
 
@@ -620,7 +632,7 @@ int change_password(int sfd, int id, int user) {
 	memset(password, '\0', sizeof(password));
 
 	output("Enter new password: ");
-	input_size(password, sizeof(password));
+	input(password);
 
 	int opcode;
 	if(user == STUDENT) {
@@ -658,7 +670,7 @@ int faculty(int socket_fd) {
    	int run = 1;
    	int res = -1;
    	while(run) {
-   		output("Enter 1 to add a new course\nEnter 2 to Remove a course\nEnter 3 to view enrollments for a course\nEnter 4 to change password\nEnter 0 to sign out\n");
+   		output("Enter 1 to add a new course\nEnter 2 to Remove a course\nEnter 3 to view enrollments for a course\nEnter 4 to change password\nEnter 0 to sign out\nEnter your option: ");
    		char option;
    		input_size(&option, 1);
    		if(option == '1') {
@@ -680,6 +692,7 @@ int faculty(int socket_fd) {
    		else {
    			output("Invalid option, try again\n");
    		}
+		output("------------------------------------------------\n");
    	}
    	return res;
 }
@@ -687,12 +700,12 @@ int faculty(int socket_fd) {
 int enroll_course(int sfd, int sid) {
 	int opcode = 12;
 	send(sfd, &opcode, sizeof(opcode), 0);
-
+	printf("Student id is: %d\n", sid);
 	char cid_str[100];
 	memset(cid_str, '\0', sizeof(cid_str));
 	
 	output("Enter course id: ");
-	int cid_size = input_size(cid_str, sizeof(cid_str));
+	int cid_size = input(cid_str);
 	int cid = parse_int(cid_size, cid_str);
 	
 
@@ -723,7 +736,7 @@ int unenroll_course(int sfd, int sid) {
 	memset(cid_str, '\0', sizeof(cid_str));
 
 	output("Enter course id: ");
-	int cid_size = input_size(cid_str, sizeof(cid_str));
+	int cid_size = input(cid_str);
 	int cid = parse_int(cid_size, cid_str);
 
 	send(sfd, &sid, sizeof(sid), 0);
@@ -753,7 +766,7 @@ int student(int socket_fd) {
 	int run = 1;
 	int res = -1;
 	while(run) {
-		output("Enter 1 to enroll to new course\nEnter 2 to unenroll from a course\nEnter 3 to change password\nEnter 0 to exit\n");
+		output("Enter 1 to enroll to new course\nEnter 2 to unenroll from a course\nEnter 3 to change password\nEnter 0 to exit\nEnter your option: ");
 		char option;
 		input_size(&option, 1);
 		if(option == '1') {
@@ -773,6 +786,7 @@ int student(int socket_fd) {
 			output("Invalid option, try again\n");
 			res = -1;
 		}
+		output("------------------------------------------------\n");
 	}
 	return res;
 }
@@ -806,6 +820,9 @@ int main() {
 			student(cfd);
 		}
 		else if(option == '0') {
+			int quit = -1;
+			send(cfd, &quit, sizeof(quit), 0);
+			close(cfd);
 			run = 0;
 		}
 		else {
