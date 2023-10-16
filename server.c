@@ -1469,7 +1469,7 @@ int enroll_course(int cfd) {
 		}
 
 		if(already_enrolled == 0) {
-			if(course.studentIdx <= course.maxStrength) {
+			if(course.studentIdx + 1 <= course.maxStrength) {
 				course.students[course.studentIdx] = sid;
 				course.studentIdx++;
 
