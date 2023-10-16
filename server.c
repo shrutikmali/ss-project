@@ -1095,6 +1095,8 @@ int edit_student(int cfd) {
 	if(res > 0) {
 		int email_collision = search_student_email(email, fd);
 		if(email_collision == 0) {
+			int res = search_student_id(id, fd);
+
 			// First get lock
 			struct Student student;
 			struct flock lock;
