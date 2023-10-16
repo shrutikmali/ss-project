@@ -570,7 +570,6 @@ int remove_course(int sfd, int fid) {
 	input(id_str);
 	int id = parse_int(100, id_str);
 	printf("Id is: %d\n", id);
-	send(sfd, &fid, sizeof(fid), 0);
 	send(sfd, &id, sizeof(id), 0);
 
 	int res;
@@ -589,7 +588,7 @@ int remove_course(int sfd, int fid) {
 	return res;
 }
 
-int view_enrollments(int sfd, int fid) {
+int view_enrollments_faculty(int sfd, int fid) {
 	int opcode = 9;
 	send(sfd, &opcode, sizeof(opcode), 0);
 	
@@ -680,7 +679,7 @@ int faculty(int socket_fd) {
    			res = remove_course(socket_fd, id);
    		}
    		else if(option == '3') {
-   			res = view_enrollments(socket_fd, id);
+   			res = view_enrollments_faculty(socket_fd, id);
    		}
    		else if(option == '4') {
    			res = change_password(socket_fd, id, FACULTY);
@@ -756,6 +755,33 @@ int unenroll_course(int sfd, int sid) {
 	}
 }
 
+int view_enrollments_student(int sfd, int id) {
+	int opcode = 17;
+	send(sfd, &opcode, sizeof(opcode), 0);
+
+	send(sfd, &id, sizeof(id), 0);
+	int res = 0;
+
+	char name[100];
+
+	while(1) {
+		memset(name, '\0', sizeof(name));
+
+		recv(sfd, &res, sizeof(res), 0);
+		if(res > 0) {
+			recv(sfd, &name, sizeof(name), 0);
+
+			output(name);
+			output("\n");
+		}
+		else {
+			break;
+		}
+	}
+
+	return res;
+}
+
 int student(int socket_fd) {
 	int id = login(socket_fd, STUDENT);
 	if(id == -1) {
@@ -766,7 +792,7 @@ int student(int socket_fd) {
 	int run = 1;
 	int res = -1;
 	while(run) {
-		output("Enter 1 to enroll to new course\nEnter 2 to unenroll from a course\nEnter 3 to change password\nEnter 0 to exit\nEnter your option: ");
+		output("Enter 1 to enroll to new course\nEnter 2 to unenroll from a course\nEnter 3 to view enrollments\nEnter 4 to change password\nEnter 0 to exit\nEnter your option: ");
 		char option;
 		input_size(&option, 1);
 		if(option == '1') {
@@ -776,6 +802,9 @@ int student(int socket_fd) {
 			res = unenroll_course(socket_fd, id);
 		}
 		else if(option == '3') {
+			res = view_enrollments_student(socket_fd, id);
+		}
+		else if(option == '4') {
 			res = change_password(socket_fd, id, STUDENT);
 		}
 		else if(option == '0') {
