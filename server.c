@@ -1115,9 +1115,9 @@ int edit_student(int cfd) {
 				// Write struct back to file
 				lseek(fd, sizeof(student) * -1, SEEK_CUR);
 				write(fd, &student, sizeof(student));
-				lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 				res = 1;
 			}
+			lock_res = set_lock(fd, &lock, UNLOCK, SEEK_SET, 0, 0);
 		}
 		else if(email_collision == 1) {
 			res = -1;
