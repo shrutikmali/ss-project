@@ -823,16 +823,31 @@ int student(int socket_fd) {
 int main() {
 	int cfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server;
-   	server.sin_family = AF_INET;
-    server.sin_port = htons(5002);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(5000);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
-	int connect_res = connect(cfd, (struct sockaddr*)&server, sizeof(server));
-	if(connect_res == -1) {
-		output("Error connecting\n");
-       	return -1;
+
+    int connect_res = connect(cfd, (struct sockaddr*)&server, sizeof(server));
+    if(connect_res == -1) {
+        output("Error connecting\n");
+        return -1;
+    }
+    output("Connected to server\n");
+	output("Getting next port\n");
+	sleep(3);
+    int newPort;
+
+	recv(cfd, &newPort, sizeof(newPort), 0);
+    printf("New port: %d\n", newPort);
+   	cfd = socket(AF_INET, SOCK_STREAM, 0);
+   	server.sin_port = htons(newPort);
+   	connect_res = connect(cfd, (struct sockaddr*)&server, sizeof(server));
+   	if(connect_res == -1) {
+   		printf("Error connecting\n");
+   		return -1;
    	}
+
 	int run = 1;
-	printf("Socket in main: %d\n", cfd);
 	output("Welcome to Academia Portal\n");
 	while(run) {
 		output("Enter 1 to sign in as admin\nEnter 2 to sign in as faculty\nEnter 3 to sign in as student\nEnter 0 to exit\n");

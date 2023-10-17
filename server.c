@@ -1641,32 +1641,7 @@ int view_enrollments_student(int cfd) {
 	return 0;
 }
 
-int main() {
-	int sfd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(5002);
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
-    int bind_res = bind(sfd, (struct sockaddr*)&server, sizeof(server));
-
-	if(bind_res == -1) {
-		output("Error binding\n");
-		return -1;
-	}
-	output("Listening\n");
-	int listen_res = listen(sfd, 5);
-
-	if(listen_res != 0) {
-		output("Error listening\n");
-	}
-
-	struct sockaddr_in client;
-    int client_size = sizeof(client);
-    int cfd = accept(sfd, (struct sockaddr*)&client, &client_size);
-	if(cfd == -1) {
-		output("Error accepting client\n");
-	}
-	output("Client connected\n");
+int routes(int cfd) {
 	int run = 1;
 	while(run) {
 		int opcode;
@@ -1735,5 +1710,74 @@ int main() {
 				break;
 		}
 	}
+	return 0;
+
+}
+
+int main() {
+	int sfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(5000);
+    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    int bind_res = bind(sfd, (struct sockaddr*)&server, sizeof(server));
+
+    if(bind_res == -1) {
+        output("Error binding\n");
+        return -1;
+    }
+
+	int nextHost = 5001;
+
+	while(1) {
+		output("Listening\n");
+		int listen_res = listen(sfd, 5);
+
+		if(listen_res != 0) {
+			output("Error listening\n");
+		}
+
+		struct sockaddr_in client;
+    	int client_size = sizeof(client);
+    	int cfd = accept(sfd, (struct sockaddr*)&client, &client_size);
+    	if(cfd == -1) {
+        	output("Error accepting client\n");
+    	}
+
+		// Send the next port to client
+		send(cfd, &nextHost, sizeof(nextHost), 0);
+		
+		if(!fork()) {
+			sfd = socket(AF_INET, SOCK_STREAM, 0);
+    		//struct sockaddr_in server;
+    		server.sin_family = AF_INET;
+    		server.sin_port = htons(nextHost);
+    		server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    		bind_res = bind(sfd, (struct sockaddr*)&server, sizeof(server));
+
+			if(bind_res == -1) {
+				output("Error binding in child\n");
+				return -1;
+			}
+			output("Child listening\n");
+			if(listen(sfd, 1) != 0) {
+				perror("Error listening in child: ");
+				return -1;
+			}
+
+			cfd = accept(sfd, (struct sockaddr*)&client, &client_size);
+			if(cfd == -1) {
+				perror("Error accepting in child: ");
+				return -1;
+			}
+			output("A client connected\n");
+			routes(cfd);
+			return 0;
+    	}
+    	else {
+			nextHost++;
+    	}
+	}
+
 	return 0;
 }
